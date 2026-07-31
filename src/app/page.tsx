@@ -1,101 +1,133 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Plus, ChevronRight, Trophy, Calendar } from 'lucide-react';
+import AppHeader, { BottomNav } from '@/components/AppHeader';
+import StandingsTable from '@/components/StandingsTable';
+import { createClient } from '@/lib/supabase/client';
+import { computeRankings } from '@/lib/rankings';
+import { formatDate } from '@/lib/utils';
+import type { Event, MatchWithPlayers, Player, Season } from '@/lib/types';
+
+export default function HomePage() {
+  const supabase = createClient();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [season, setSeason] = useState<Season | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data: seasons } = await supabase
+        .from('seasons')
+        .select('*')
+        .eq('is_current', true)
+        .limit(1);
+
+      const s = (seasons && seasons[0]) || null;
+      setSeason(s);
+
+      const [{ data: ev }, { data: pl }, { data: mt }] = await Promise.all([
+        supabase.from('events').select('*').order('event_date', { ascending: false }),
+        supabase.from('players').select('*').order('name'),
+        supabase
+          .from('matches')
+          .select('*, p1:players!player1_id(*), p2:players!player2_id(*), p3:players!player3_id(*), p4:players!player4_id(*)')
+          .eq('status', 'completed'),
+      ]);
+
+      if (ev) setEvents(ev as Event[]);
+      if (pl) setPlayers(pl as Player[]);
+      if (mt) setMatches(mt as MatchWithPlayers[]);
+      setLoading(false);
+    })();
+  }, [supabase]);
+
+  const active = events.filter((e) => e.status === 'active');
+  const completed = events.filter((e) => e.status === 'completed');
+  const rows = computeRankings(players, matches);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="pb-20">
+      <AppHeader title="PDPadel" subtitle={season?.name} action={{ label: 'Nueva', href: '/events/new' }} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+      <main className="mx-auto max-w-lg px-4 py-5">
+        {loading && (
+          <p className="py-10 text-center text-sm text-slate-400">Cargando…</p>
+        )}
+
+        {!loading && active.length > 0 && (
+          <section className="mb-7">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">
+              Jornadas en curso
+            </h2>
+            <div className="flex flex-col gap-3">
+              {active.map((e) => (
+                <EventCard key={e.id} event={e} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && active.length === 0 && (
+          <section className="card mb-7 flex flex-col items-center gap-2 py-8 text-center">
+            <Plus size={28} className="text-slate-500" />
+            <p className="text-sm text-slate-300">No hay jornadas activas</p>
+            <p className="text-xs text-slate-500">
+              Crea una nueva jornada y genera los partidos.
+            </p>
+            <Link href="/events/new" className="btn-primary mt-2">
+              Crear jornada
+            </Link>
+          </section>
+        )}
+
+        <section className="mb-7">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
+            <Trophy size={15} className="text-amber-400" />
+            Clasificación {season?.name ?? ''}
+          </h2>
+          <StandingsTable rows={rows} />
+        </section>
+
+        {completed.length > 0 && (
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">
+              Jornadas finalizadas
+            </h2>
+            <div className="flex flex-col gap-3">
+              {completed.map((e) => (
+                <EventCard key={e.id} event={e} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      <BottomNav active="home" />
     </div>
+  );
+}
+
+function EventCard({ event }: { event: Event }) {
+  return (
+    <Link
+      href={`/events/${event.id}`}
+      className="card flex items-center justify-between gap-3 hover:border-slate-700"
+    >
+      <div className="min-w-0">
+        <p className="truncate font-semibold">
+          {event.name || 'Jornada'}
+        </p>
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
+          <Calendar size={12} />
+          {formatDate(event.event_date)} · {event.courts}{' '}
+          {event.courts === 1 ? 'cancha' : 'canchas'}
+        </p>
+      </div>
+      <ChevronRight size={18} className="shrink-0 text-slate-500" />
+    </Link>
   );
 }
