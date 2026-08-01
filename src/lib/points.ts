@@ -1,4 +1,4 @@
-import { WIN_POINTS } from './constants';
+import { SETS_WIN_POINTS, WIN_POINTS } from './constants';
 import { displayName } from './utils';
 import type { MatchWithUsers, User } from './types';
 
@@ -17,8 +17,7 @@ export interface SeasonRankingRow {
 
 export function computeSeasonRanking(
   users: User[],
-  matches: MatchWithUsers[],
-  winPoints: number = WIN_POINTS
+  matches: MatchWithUsers[]
 ): SeasonRankingRow[] {
   const map = new Map<string, SeasonRankingRow>();
 
@@ -54,10 +53,10 @@ export function computeSeasonRanking(
       const scoreAgainst = isT1 ? m.score_team2 : m.score_team1;
 
       row.played += 1;
-      if ((m.mode ?? 'points') === 'points') {
-        row.pointsFor += scoreFor;
-        row.pointsAgainst += scoreAgainst;
-      }
+      // El marcador (puntos o set único sin fin) suma a la diferencia.
+      row.pointsFor += scoreFor;
+      row.pointsAgainst += scoreAgainst;
+      // Desempate adicional con el detalle set a set (si lo hubiera).
       if (m.mode === 'sets' && m.sets_details) {
         for (const s of m.sets_details) {
           row.setsFor += isT1 ? s.t1 : s.t2;
@@ -66,7 +65,9 @@ export function computeSeasonRanking(
       }
       if (winner === team) {
         row.wins += 1;
-        row.points += winPoints;
+        // En modo sets la pareja ganadora anota 1 punto (los sets quedan
+        // guardados para desempate); en modo puntos anota 2.
+        row.points += (m.mode ?? 'points') === 'sets' ? SETS_WIN_POINTS : WIN_POINTS;
       } else if (winner) {
         row.losses += 1;
       }

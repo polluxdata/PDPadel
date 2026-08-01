@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { Play, X, CheckCircle2, Loader2 } from 'lucide-react';
+import MatchScorer from '@/components/MatchScorer';
 import type { MatchWithUsers } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/constants';
 import { teamLabel } from '@/lib/utils';
@@ -9,16 +8,16 @@ import { cn } from '@/lib/utils';
 
 export default function MatchCard({
   match,
-  groupId,
-  onSkip,
-  busy,
+  mode,
+  targetScore,
   admin,
+  onChanged,
 }: {
   match: MatchWithUsers;
-  groupId: string;
-  onSkip?: (id: string) => void;
-  busy?: boolean;
+  mode: 'points' | 'sets';
+  targetScore: number;
   admin?: boolean;
+  onChanged?: () => void;
 }) {
   const teamA = [match.p1, match.p2];
   const teamB = [match.p3, match.p4];
@@ -27,7 +26,7 @@ export default function MatchCard({
   return (
     <div
       className={cn(
-        'card flex flex-col gap-3',
+        'card flex flex-col gap-3 !p-3',
         match.status === 'completed' && 'border-emerald-800 bg-emerald-950/20',
         match.status === 'skipped' && 'opacity-60'
       )}
@@ -52,59 +51,36 @@ export default function MatchCard({
         </span>
       </div>
 
-      <div className="flex flex-col gap-1.5 text-sm">
-        <div className="flex items-center justify-between rounded-lg bg-slate-800/70 px-3 py-2">
-          <span className="font-semibold">{teamLabel(teamA)}</span>
+      {admin && match.status !== 'skipped' ? (
+        <MatchScorer
+          match={match}
+          mode={mode}
+          target={targetScore}
+          editing={done}
+          onSaved={() => onChanged?.()}
+        />
+      ) : (
+        <>
+          <div className="flex flex-col gap-1.5 text-sm">
+            <div className="flex items-center justify-between rounded-lg bg-slate-800/70 px-3 py-2">
+              <span className="font-semibold">{teamLabel(teamA)}</span>
+              {match.status === 'completed' && (
+                <span className="font-mono text-emerald-400">{match.score_team1}</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-slate-800/70 px-3 py-2">
+              <span className="font-semibold">{teamLabel(teamB)}</span>
+              {match.status === 'completed' && (
+                <span className="font-mono text-emerald-400">{match.score_team2}</span>
+              )}
+            </div>
+          </div>
           {match.status === 'completed' && (
-            <span className="font-mono text-emerald-400">
-              {match.score_team1}
-              {match.sets_details
-                ? ` (${match.sets_details.map((s) => s.t1).join('-')})`
-                : ''}
-            </span>
+            <p className="text-xs font-semibold text-emerald-400">
+              Ganó {match.winner_team === 1 ? teamLabel(teamA) : teamLabel(teamB)}
+            </p>
           )}
-        </div>
-        <div className="flex items-center justify-between rounded-lg bg-slate-800/70 px-3 py-2">
-          <span className="font-semibold">{teamLabel(teamB)}</span>
-          {match.status === 'completed' && (
-            <span className="font-mono text-emerald-400">
-              {match.score_team2}
-              {match.sets_details
-                ? ` (${match.sets_details.map((s) => s.t2).join('-')})`
-                : ''}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {!done && admin && (
-        <div className="flex gap-2">
-          <Link
-            href={`/groups/${groupId}/quedadas/${match.quedada_id}/matches/${match.id}`}
-            className="btn-primary flex-1"
-          >
-            <Play size={16} />
-            Jugar
-          </Link>
-          {onSkip && (
-            <button
-              onClick={() => onSkip(match.id)}
-              disabled={busy}
-              className="btn-secondary flex-1"
-            >
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
-              Saltar
-            </button>
-          )}
-        </div>
-      )}
-      {done && (
-        <div className="flex items-center gap-2 text-xs text-emerald-400">
-          <CheckCircle2 size={14} />
-          {match.status === 'completed'
-            ? `Ganó ${match.winner_team === 1 ? teamLabel(teamA) : teamLabel(teamB)}`
-            : 'Partido saltado'}
-        </div>
+        </>
       )}
     </div>
   );
