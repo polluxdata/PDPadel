@@ -7,10 +7,13 @@ interface Body {
   email?: string;
   mode?: 'login' | 'signup' | 'invite';
   token?: string;
+  username?: string;
   firstName?: string;
   lastName?: string;
   nickname?: string;
 }
+
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as Body;
@@ -19,6 +22,30 @@ export async function POST(req: NextRequest) {
 
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return NextResponse.json({ ok: false, error: 'Ingresa un email válido.' }, { status: 400 });
+  }
+
+  const username = body.username?.trim().toLowerCase() ?? '';
+
+  // Para alta: el nombre de usuario es obligatorio y único.
+  if (mode === 'signup') {
+    if (!USERNAME_RE.test(username)) {
+      return NextResponse.json(
+        { ok: false, error: 'El nombre de usuario debe tener 3–20 caracteres (minúsculas, números, _).' },
+        { status: 400 }
+      );
+    }
+    const supabase0 = createClient();
+    const { data: taken } = await supabase0
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+    if (taken) {
+      return NextResponse.json(
+        { ok: false, error: 'Ese nombre de usuario ya existe. Elige otro.' },
+        { status: 409 }
+      );
+    }
   }
 
   const supabase = createClient();
@@ -62,9 +89,10 @@ export async function POST(req: NextRequest) {
   const payload =
     mode === 'signup'
       ? {
+          username,
           firstName: body.firstName ?? '',
           lastName: body.lastName ?? '',
-          nickname: body.nickname ?? null,
+          nickname: null,
         }
       : null;
 

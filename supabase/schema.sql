@@ -172,8 +172,7 @@ create index if not exists audit_log_entity_idx on public.audit_log (entity, ent
 -- RLS
 -- App privada: el acceso se controla en la capa de la app (sesión
 -- con PIN). La llave anon puede leer/escribir las tablas directamente.
--- ============================================================
-alter table public.users enable row level security;
+-- ============================================================alter table public.users enable row level security;
 alter table public.groups enable row level security;
 alter table public.group_members enable row level security;
 alter table public.seasons enable row level security;
@@ -196,3 +195,37 @@ end $$;
 
 -- El usuario 0 (super admin) lo crea la app al primer arranque
 -- (POST /api/auth/bootstrap) usando la variable SUPER_ADMIN_PIN.
+
+-- ============================================================
+-- TRIGGER: si se borra el dueño de un grupo, el grupo pasa al
+-- super admin (evita grupos huérfanos).
+-- ============================================================
+create or replace function public.reassign_group_on_user_delete()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare v_super uuid;
+begin
+  select id into v_super from public.users where role = 'super_admin' limit 1;
+  if v_super is null then
+    return old;
+  end if;
+  update public.groups set admin_id = v_super where admin_id = old.id;
+  insert into public.group_members (group_id, user_id, role)
+    select g.id, v_super, 'admin'
+    from public.groups g
+    where g.admin_id = v_super
+      and not exists (
+        select 1 from public.group_members m
+        where m.group_id = g.id and m.user_id = v_super
+      )
+    on conflict (group_id, user_id) do update set role = 'admin';
+  return old;
+end;
+$$;
+
+drop trigger if exists trg_reassign_group_on_user_delete on public.users;
+create trigger trg_reassign_group_on_user_delete
+  before delete on public.users
+  for each row execute function public.reassign_group_on_user_delete();

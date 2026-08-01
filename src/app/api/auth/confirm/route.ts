@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { SESSION_COOKIE } from '@/middleware';
 
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
 export async function POST(req: NextRequest) {
   const { token } = (await req.json().catch(() => ({}))) as { token?: string };
   const supabase = createClient();
@@ -30,7 +32,11 @@ export async function POST(req: NextRequest) {
   // Alta: crear el usuario si no existe (signup / invitación a un email nuevo).
   if (!userId) {
     const payload = (ml.payload ?? {}) as Record<string, unknown>;
-    const base = ml.email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || 'user';
+    const chosen = String(payload.username ?? '').toLowerCase();
+    // Usar el usuario elegido en el alta; si por una carrera ya existe, añadir sufijo.
+    const base = USERNAME_RE.test(chosen)
+      ? chosen
+      : ml.email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || 'user';
     let username = base;
     let n = 1;
     for (;;) {
