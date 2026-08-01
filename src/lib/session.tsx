@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import type { PublicUser } from '@/lib/types';
 
 interface SessionValue {
@@ -18,8 +19,10 @@ const Ctx = createContext<SessionValue>({
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+  const prevPath = useRef(pathname);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/session');
       if (res.ok) {
@@ -32,11 +35,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
+
+  // Si no hay sesión y cambia la ruta (tras login o magic link), reintenta.
+  useEffect(() => {
+    if (prevPath.current !== pathname && !user) {
+      refresh();
+    }
+    prevPath.current = pathname;
+  }, [pathname, user, refresh]);
 
   return <Ctx.Provider value={{ user, loading, refresh }}>{children}</Ctx.Provider>;
 }

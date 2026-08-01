@@ -2,22 +2,18 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail, CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
-    code: '',
-    username: '',
+    email: '',
     firstName: '',
     lastName: '',
-    email: '',
     nickname: '',
-    pin: '',
-    pin2: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [sent, setSent] = useState(false);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -26,97 +22,85 @@ export default function RegisterPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (form.pin !== form.pin2) {
-      setError('Los PIN no coinciden.');
-      return;
-    }
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch('/api/auth/magic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: form.code.trim(),
-          username: form.username.trim(),
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim() || undefined,
-          nickname: form.nickname.trim() || undefined,
-          pin: form.pin,
+          email: form.email,
+          mode: 'signup',
+          firstName: form.firstName,
+          lastName: form.lastName,
+          nickname: form.nickname,
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setDone(true);
+        setSent(true);
       } else {
-        setError(data.error || 'No se pudo registrar.');
+        setError(data.error || 'No se pudo enviar el enlace.');
       }
     } finally {
       setLoading(false);
     }
   }
 
-  if (done) {
+  if (sent) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-950 px-6 text-center">
-        <p className="text-2xl font-extrabold">¡Registrado!</p>
-        <p className="mt-2 text-sm text-slate-400">
-          Ya puedes iniciar sesión con tu usuario y PIN.
-        </p>
-        <Link href="/login" className="btn-primary mt-6">
-          Ir a iniciar sesión
-        </Link>
+        <div className="rounded-xl border border-emerald-700 bg-emerald-950/30 p-6">
+          <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-400" />
+          <p className="text-lg font-extrabold text-emerald-300">Revisa tu correo</p>
+          <p className="mt-2 max-w-xs text-sm text-slate-400">
+            Te enviamos un enlace para confirmar tu registro en PDPadel. Vence en
+            15 minutos.
+          </p>
+          <Link href="/login" className="btn-ghost mt-4 w-full !py-2 text-xs">
+            Volver al login
+          </Link>
+        </div>
       </main>
     );
   }
-
-  const field = 'input';
-  const label = 'label';
 
   return (
     <main className="flex min-h-dvh flex-col bg-slate-950 px-6 py-8">
       <div className="mx-auto w-full max-w-md">
         <h1 className="text-2xl font-extrabold">Crear cuenta</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Necesitas un código de invitación (token diario o PIN de un
-          administrador).
+          Con tu correo recibirás un enlace para confirmar tu registro.
         </p>
 
         <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
           <div>
-            <label className={label}>Código de registro</label>
-            <input
-              className={field}
-              value={form.code}
-              onChange={(e) => set('code', e.target.value)}
-              placeholder="Token diario o PIN"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className={label}>Usuario</label>
-            <input
-              className={field}
-              value={form.username}
-              onChange={(e) => set('username', e.target.value)}
-              placeholder="Cómo te vas a logear"
-            />
+            <label className="label">Email</label>
+            <div className="relative">
+              <Mail size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="email"
+                className="input !pl-11"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                placeholder="tu@correo.com"
+                autoFocus
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={label}>Nombre</label>
+              <label className="label">Nombre</label>
               <input
-                className={field}
+                className="input"
                 value={form.firstName}
                 onChange={(e) => set('firstName', e.target.value)}
               />
             </div>
             <div>
-              <label className={label}>Apellido</label>
+              <label className="label">Apellido</label>
               <input
-                className={field}
+                className="input"
                 value={form.lastName}
                 onChange={(e) => set('lastName', e.target.value)}
               />
@@ -124,54 +108,20 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className={label}>Apodo (opcional)</label>
+            <label className="label">Apodo (opcional)</label>
             <input
-              className={field}
+              className="input"
               value={form.nickname}
               onChange={(e) => set('nickname', e.target.value)}
               placeholder="Como apareces en el ranking"
             />
           </div>
 
-          <div>
-            <label className={label}>Email (opcional)</label>
-            <input
-              type="email"
-              className={field}
-              value={form.email}
-              onChange={(e) => set('email', e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={label}>PIN de acceso</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                className={field}
-                value={form.pin}
-                onChange={(e) => set('pin', e.target.value)}
-                placeholder="Mínimo 4"
-              />
-            </div>
-            <div>
-              <label className={label}>Repite el PIN</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                className={field}
-                value={form.pin2}
-                onChange={(e) => set('pin2', e.target.value)}
-              />
-            </div>
-          </div>
-
           {error && <p className="text-sm text-rose-400">{error}</p>}
 
-          <button type="submit" disabled={loading} className="btn-primary mt-1 w-full">
+          <button type="submit" disabled={loading || !form.email} className="btn-primary mt-1 w-full">
             {loading && <Loader2 size={16} className="animate-spin" />}
-            Registrarme
+            Enviarme el enlace de registro
           </button>
 
           <p className="text-center text-sm text-slate-400">

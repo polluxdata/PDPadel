@@ -20,7 +20,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const [pinRole, setPinRole] = useState<'player' | 'admin'>('player');
-  const [pin, setPin] = useState('');
+  const [invite, setInvite] = useState('');
   const [generating, setGenerating] = useState(false);
 
   const load = useCallback(async () => {
@@ -102,10 +102,10 @@ export default function MembersClient({ groupId }: { groupId: string }) {
     await load();
   }
 
-  async function generatePin() {
+  async function generateInvite() {
     if (!user) return;
     setGenerating(true);
-    const res = await fetch('/api/auth/pins', {
+    const res = await fetch('/api/auth/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ groupId, role: pinRole }),
@@ -113,9 +113,9 @@ export default function MembersClient({ groupId }: { groupId: string }) {
     const data = await res.json();
     setGenerating(false);
     if (res.ok) {
-      setPin(data.code);
+      setInvite(data.url);
     } else {
-      alert(data.error || 'No se pudo generar el PIN.');
+      alert(data.error || 'No se pudo generar el enlace.');
     }
   }
 
@@ -135,8 +135,12 @@ export default function MembersClient({ groupId }: { groupId: string }) {
       <main className="mx-auto max-w-lg px-4 py-5">
         <section className="card mb-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
-            <KeyRound size={15} className="text-emerald-400" /> Generar PIN de invitación
+            <KeyRound size={15} className="text-emerald-400" /> Enlace de invitación
           </h2>
+          <p className="mb-3 text-xs text-slate-500">
+            Genera un enlace y compártelo por WhatsApp. Quien lo abra, verifica su
+            correo y queda dentro del grupo.
+          </p>
           <div className="mb-3 flex gap-2">
             <button
               onClick={() => setPinRole('player')}
@@ -161,24 +165,23 @@ export default function MembersClient({ groupId }: { groupId: string }) {
               Administrador
             </button>
           </div>
-          <button onClick={generatePin} disabled={generating} className="btn-secondary w-full">
+          <button onClick={generateInvite} disabled={generating} className="btn-secondary w-full">
             {generating && <Loader2 size={16} className="animate-spin" />}
-            Generar PIN
+            Generar enlace
           </button>
-          {pin && (
-            <div className="mt-3 rounded-xl border border-emerald-700 bg-emerald-950/30 p-3 text-center">
-              <p className="text-xs text-slate-400">
-                PIN para {pinRole === 'admin' ? 'administrador' : 'jugador'}{' '}
-                (una sola vez):
+          {invite && (
+            <div className="mt-3 rounded-xl border border-emerald-700 bg-emerald-950/30 p-3">
+              <p className="mb-2 text-center text-xs text-slate-400">
+                Enlace para {pinRole === 'admin' ? 'administrador' : 'jugador'} (válido 7 días):
               </p>
-              <p className="mt-1 text-3xl font-black tracking-[0.4em] text-emerald-300">
-                {pin}
+              <p className="break-all rounded-lg bg-slate-900 px-3 py-2 text-xs text-emerald-300">
+                {invite}
               </p>
               <button
-                onClick={() => navigator.clipboard.writeText(pin)}
-                className="btn-ghost !py-1.5 text-xs"
+                onClick={() => navigator.clipboard.writeText(invite)}
+                className="btn-ghost mt-2 w-full !py-1.5 text-xs"
               >
-                <Copy size={14} /> Copiar
+                <Copy size={14} /> Copiar enlace
               </button>
             </div>
           )}

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { SESSION_COOKIE } from '@/middleware';
 import type { PublicUser } from '@/lib/types';
 
-function toPublic(u: PublicUser & { pin_hash: string }): PublicUser {
+function toPublic(u: PublicUser & { pin_hash?: string | null }): PublicUser {
   return {
     id: u.id,
     username: u.username,
@@ -45,6 +45,12 @@ export async function POST(req: NextRequest) {
   }
   if (!user.is_active) {
     return NextResponse.json({ ok: false, error: 'Usuario desactivado.' }, { status: 403 });
+  }
+  if (!user.pin_hash) {
+    return NextResponse.json(
+      { ok: false, error: 'Este usuario entra con correo (magic link).' },
+      { status: 401 }
+    );
   }
 
   const valid = await bcrypt.compare(pin, user.pin_hash);

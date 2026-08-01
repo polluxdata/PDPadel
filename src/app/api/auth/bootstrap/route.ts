@@ -31,6 +31,7 @@ export async function POST() {
       pin_hash,
       first_name: 'Super',
       last_name: 'Admin',
+      email: process.env.SUPER_ADMIN_EMAIL || null,
       role: 'super_admin',
     })
     .select('id, username')

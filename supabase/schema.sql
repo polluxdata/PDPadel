@@ -140,6 +140,28 @@ create table if not exists public.registration_codes (
 );
 
 -- ============================================================
+-- MAGIC LINKS (login / alta / invitaciones por correo o WhatsApp)
+-- ============================================================
+create table if not exists public.magic_links (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  email text not null,
+  token text not null unique,
+  purpose text not null default 'login' check (purpose in ('login','signup','invite')),
+  group_id uuid references public.groups(id) on delete set null,
+  role text check (role in ('admin','player')),
+  payload jsonb,
+  used boolean not null default false,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists magic_links_token_idx on public.magic_links (token);
+
+-- email único (cuando exista) y rol por membresía (múltiples admins)
+create unique index if not exists users_email_unique on public.users (lower(email)) where email is not null;
+alter table public.group_members add column if not exists role text not null default 'player' check (role in ('admin','player'));
+
+-- ============================================================
 -- AUDIT LOG (trazabilidad de quién hizo qué)
 -- ============================================================
 create table if not exists public.audit_log (
@@ -167,6 +189,7 @@ alter table public.quedadas enable row level security;
 alter table public.quedada_players enable row level security;
 alter table public.matches enable row level security;
 alter table public.registration_codes enable row level security;
+alter table public.magic_links enable row level security;
 alter table public.audit_log enable row level security;
 
 do $$
@@ -174,7 +197,7 @@ declare t text;
 begin
   foreach t in array array[
     'users','groups','group_members','seasons','quedadas',
-    'quedada_players','matches','registration_codes','audit_log'
+    'quedada_players','matches','registration_codes','magic_links','audit_log'
   ] loop
     execute format('create policy %I on public.%I for all using (true) with check (true)', t || '_all', t);
   end loop;

@@ -33,7 +33,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Puntos de ranking**: modo puntos = 2 pts por victoria; modo sets = 1 pt (`SETS_WIN_POINTS`). El marcador (pointsFor/Against) siempre suma a la diferencia de desempate; `sets_details` es legado opcional.
 - **Partidos**: no se pueden "saltar" (no hay botón). La quedada puede finalizar antes con "Finalizar quedada"; los pendientes no cuentan.
 - **Edición**: el admin puede editar resultados ya registrados (el marcador inline con "Guardar cambios"). `MatchScorer` sincroniza su estado con la prop `match` tras recargar.
-- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `issue_pin`, `register`, `login`, `update_profile`.
+- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `issue_pin`, `register`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
 
 ## Matchmaking
 
@@ -53,6 +53,24 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - Ver `.env.local.example`. `.env.local` real está en `.gitignore`.
 
 ## Observaciones / pendientes
+
+### Decisiones de diseño aprobadas (pendientes de implementar)
+
+- **Auth con magic link** (reemplaza PIN/token diario): **IMPLEMENTADO** (login, alta e invitación).
+  - Login y alta por correo (enlace de verificación 15 min, un solo uso, tabla `magic_links`).
+  - `users.email` pasa a ser único y obligatorio (índice único `users_email_unique`); `pin_hash` es opcional (usuarios de magic link no tienen PIN).
+  - El super admin entra con magic link (`SUPER_ADMIN_EMAIL`); desaparece `SUPER_ADMIN_PIN`. (PIN sigue como respaldo temporal.)
+  - SMTP: OCI Email Delivery en `lib/mail.ts` (nodemailer). Credenciales solo en vars de entorno, nunca `NEXT_PUBLIC_`.
+  - Endpoints: `POST /api/auth/magic` (login/signup/invite), `POST /api/auth/invite`, `POST /api/auth/accept-invite`, `GET /auth/confirm` (confirma y crea sesión), `GET /auth/invite` (pantalla para invitado: si está logueado acepta directo, si no pide email).
+- **Alta por invitación (Opción B)**: **IMPLEMENTADO** — el admin genera un **enlace de invitación** (grupo + rol, válido 7 días) y lo comparte por WhatsApp. El invitado lo abre, pone su email, recibe un magic link y queda dentro del grupo con el rol del enlace.
+- **Múltiples administradores por grupo**: **schema listo** (`group_members.role` = `admin`|`player`), **pendiente la UI** de promover/demover en Jugadores. El creador queda como dueño (`groups.admin_id`).
+- **Asignar administradores**: el **dueño** puede promover/demover admins (pantalla Jugadores). Los admins pueden invitar jugadores pero no nombrar/quitar otros admins. El super admin también puede nombrar admins. **Pendiente de implementar en la UI.**
+- **Permisos de edición de marcadores**: **PENDIENTE**.
+  - Quedada **abierta**: admins + dueño + super admin pueden registrar/editar.
+  - Quedada **cerrada**: SOLO el super admin puede editar (al cerrarse se "congelan" los marcadores).
+  - Temporada **cerrada**: solo lectura para todos.
+
+### Pendientes generales
 
 - **Seguridad**: el `sb_secret_`/service_role nunca debe ir al navegador. La `sb_secret_` compartida en conversación debería rotarse en Supabase.
 - **RLS abierta**: para producción multi-tenant conviene cerrar RLS por rol/sesión.

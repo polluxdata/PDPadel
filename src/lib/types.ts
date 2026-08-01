@@ -3,7 +3,7 @@ export type UserRole = 'super_admin' | 'admin' | 'player';
 export interface User {
   id: string;
   username: string;
-  pin_hash: string;
+  pin_hash: string | null;
   first_name: string;
   last_name: string;
   email: string | null;

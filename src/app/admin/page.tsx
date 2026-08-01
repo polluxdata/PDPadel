@@ -20,7 +20,7 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<User[]>([]);
   const [pinGroup, setPinGroup] = useState('');
   const [pinRole, setPinRole] = useState<'player' | 'admin'>('player');
-  const [pin, setPin] = useState('');
+  const [invite, setInvite] = useState('');
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
@@ -44,18 +44,18 @@ export default function AdminPanel() {
     })();
   }, [supabase, user]);
 
-  async function generatePin() {
+  async function generateInvite() {
     if (!pinGroup) return;
     setGenerating(true);
-    const res = await fetch('/api/auth/pins', {
+    const res = await fetch('/api/auth/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ groupId: pinGroup, role: pinRole }),
     });
     const data = await res.json();
     setGenerating(false);
-    if (res.ok) setPin(data.code);
-    else alert(data.error || 'No se pudo generar el PIN.');
+    if (res.ok) setInvite(data.url);
+    else alert(data.error || 'No se pudo generar el enlace.');
   }
 
   if (loading || !user || !isSuper(user)) {
@@ -97,7 +97,7 @@ export default function AdminPanel() {
 
         <section className="card mb-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
-            <Crown size={15} className="text-amber-400" /> Generar PIN de invitación
+            <Crown size={15} className="text-amber-400" /> Generar enlace de invitación
           </h2>
           <label className="label">Grupo</label>
           <select
@@ -136,14 +136,25 @@ export default function AdminPanel() {
               Administrador
             </button>
           </div>
-          <button onClick={generatePin} disabled={generating || !pinGroup} className="btn-secondary w-full">
+          <button onClick={generateInvite} disabled={generating || !pinGroup} className="btn-secondary w-full">
             {generating && <Loader2 size={16} className="animate-spin" />}
-            Generar PIN
+            Generar enlace
           </button>
-          {pin && (
-            <p className="mt-3 rounded-xl border border-emerald-700 bg-emerald-950/30 p-3 text-center text-3xl font-black tracking-[0.4em] text-emerald-300">
-              {pin}
-            </p>
+          {invite && (
+            <div className="mt-3 rounded-xl border border-emerald-700 bg-emerald-950/30 p-3">
+              <p className="mb-2 text-center text-xs text-slate-400">
+                Enlace para {pinRole === 'admin' ? 'administrador' : 'jugador'} (válido 7 días):
+              </p>
+              <p className="break-all rounded-lg bg-slate-900 px-3 py-2 text-xs text-emerald-300">
+                {invite}
+              </p>
+              <button
+                onClick={() => navigator.clipboard.writeText(invite)}
+                className="btn-ghost mt-2 w-full !py-1.5 text-xs"
+              >
+                <Copy size={14} /> Copiar enlace
+              </button>
+            </div>
           )}
         </section>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Users, ChevronRight, Shield, Trophy, Plus, UserCircle2, CalendarClock } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
 import { createClient } from '@/lib/supabase/client';
@@ -15,56 +16,69 @@ interface GroupWithMeta extends Group {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const supabase = createClient();
   const { user, loading: sessionLoading } = useSession();
   const [groups, setGroups] = useState<GroupWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Si la sesión cargó y no hay usuario (cookie ausente), volver al login.
+  useEffect(() => {
+    if (!sessionLoading && !user) {
+      router.replace('/login');
+    }
+  }, [sessionLoading, user, router]);
+
   useEffect(() => {
     (async () => {
       if (!user) return;
-      let groupRows: Group[] = [];
+      try {
+        let groupRows: Group[] = [];
 
-      if (isSuper(user)) {
-        const { data } = await supabase.from('groups').select('*').order('name');
-        groupRows = (data ?? []) as Group[];
-      } else {
-        const [{ data: mine }, { data: owned }] = await Promise.all([
-          supabase
-            .from('group_members')
-            .select('group:groups(*)')
-            .eq('user_id', user.id),
-          supabase.from('groups').select('*').eq('admin_id', user.id),
-        ]);
-        const asMember = ((mine ?? []) as unknown as Array<{ group: Group | null }>)
-          .map((r) => r.group)
-          .filter(Boolean) as Group[];
-        groupRows = Array.from(
-          new Map(
-            [...asMember, ...((owned ?? []) as Group[])].map((g) => [g.id, g])
-          ).values()
-        );
+        if (isSuper(user)) {
+          const { data } = await supabase.from('groups').select('*').order('name');
+          groupRows = (data ?? []) as Group[];
+        } else {
+          const [{ data: mine }, { data: owned }] = await Promise.all([
+            supabase
+              .from('group_members')
+              .select('group:groups(*)')
+              .eq('user_id', user.id),
+            supabase.from('groups').select('*').eq('admin_id', user.id),
+          ]);
+          const asMember = ((mine ?? []) as unknown as Array<{ group: Group | null }>)
+            .map((r) => r.group)
+            .filter(Boolean) as Group[];
+          groupRows = Array.from(
+            new Map(
+              [...asMember, ...((owned ?? []) as Group[])].map((g) => [g.id, g])
+            ).values()
+          );
+        }
+
+        const meta: GroupWithMeta[] = groupRows.map((g) => ({
+          ...g,
+          myRole: g.admin_id === user.id ? 'admin' : 'member',
+        }));
+
+        if (groupRows.length > 0) {
+          const { data: seasons } = await supabase
+            .from('seasons')
+            .select('*')
+            .in('group_id', groupRows.map((g) => g.id))
+            .eq('status', 'active');
+          const activeSeasons = new Map(
+            ((seasons ?? []) as Season[]).map((s) => [s.group_id, s])
+          );
+          for (const g of meta) g.currentSeason = activeSeasons.get(g.id) ?? null;
+        }
+
+        setGroups(meta);
+      } catch (err) {
+        console.error('Error cargando inicio', err);
+      } finally {
+        setLoading(false);
       }
-
-      const meta: GroupWithMeta[] = groupRows.map((g) => ({
-        ...g,
-        myRole: g.admin_id === user.id ? 'admin' : 'member',
-      }));
-
-      if (groupRows.length > 0) {
-        const { data: seasons } = await supabase
-          .from('seasons')
-          .select('*')
-          .in('group_id', groupRows.map((g) => g.id))
-          .eq('status', 'active');
-        const activeSeasons = new Map(
-          ((seasons ?? []) as Season[]).map((s) => [s.group_id, s])
-        );
-        for (const g of meta) g.currentSeason = activeSeasons.get(g.id) ?? null;
-      }
-
-      setGroups(meta);
-      setLoading(false);
     })();
   }, [supabase, user]);
 
