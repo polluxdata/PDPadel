@@ -1,37 +1,45 @@
 # PDPadel
 
 PWA de **Pádel Americano**: grupos de jugadores, temporadas, quedadas y ranking en vivo.
-Mobile-first (Next.js 14 + TypeScript + Tailwind CSS + Supabase), instalable y lista para Vercel.
+Mobile-first (Next.js 14 + TypeScript + Tailwind CSS + Supabase), instalable y desplegada en Vercel.
 
 ## Modelo de datos
 
-- **Usuarios** con roles: `super_admin` (usuario 0), `admin` (administrador de grupo), `player` (jugador).
-- **Grupos** de jugadores; cada grupo tiene un administrador.
+- **Usuarios**: identidad única (`users`). `users.role` solo distingue al `super_admin` (control global); el resto son jugadores.
+- **Grupos**: cada grupo tiene un **código único** para unirse. Al crear un grupo quedas como su **administrador**.
+- **Roles por grupo**: `group_members.role` = `admin` | `player`. Un usuario puede ser **admin en un grupo y jugador en otro**.
 - **Temporadas**: una sola activa por grupo. Al cerrarla se calcula el ganador y queda en solo lectura.
 - **Quedadas** (jornadas) dentro de una temporada: canchas, duración, formato (puntos o set único) y participantes.
 - **Partidos**: round-robin automático (cada jugador hace pareja con todos y se enfrenta a todos), distribuidos en rondas según canchas.
 - **Ranking** por temporada: 2 puntos por partido ganado en modo puntos, 1 punto en modo set; el marcador suma a la diferencia como desempate.
 - **Auditoría** (`audit_log`): trazabilidad de quién crea grupos, usuarios, temporadas, quedadas y partidos.
 
+## Acceso
+
+- **Auth por magic link** (sin contraseñas): el usuario pide un enlace con su email, lo abre y queda logueado (15 min, un solo uso).
+- **Usuario 0** (`superadmin`): se crea automáticamente con `SUPER_ADMIN_PIN`/`SUPER_ADMIN_EMAIL`; tiene el panel `/admin` (control global). El PIN de acceso es solo un respaldo temporal.
+- **Registro**: cualquier persona crea su cuenta con su email y un magic link de confirmación.
+- **Invitaciones por WhatsApp**: un admin genera un **enlace de invitación** (rol jugador/administrador, válido 7 días) y lo comparte. Al abrirlo, el invitado pone su email, recibe un magic link y queda dentro del grupo.
+- **Unirse con código**: cualquier usuario entra el **código del grupo** (página `/groups/join`) y se une como jugador.
+- **Privacidad**: cada usuario decide si **aparecer en el listado de jugadores** (para que lo agreguen a grupos) o no; si lo desactiva, solo entra por código/invitación.
+
+## Permisos
+
+- **Super admin**: control global (panel `/admin`).
+- **Admin de grupo** (dueño u otro admin de ese grupo): crear temporada y quedada, administrar jugadores, generar enlaces de invitación y registrar marcadores.
+- **Jugador**: ver su puesto, sus grupos y editar sus datos personales.
+
 ## Formatos de juego
 
 - **Puntos**: primero en llegar a la meta (21/31/50) con 2 de ventaja.
-- **Set único sin fin**: se juega un solo set corrido durante el tiempo de la ronda; gana la pareja con más puntos. No hay "al mejor de N".
-
-## Acceso y roles
-
-- El **usuario 0** (`superadmin`) se crea automáticamente al primer arranque con `SUPER_ADMIN_PIN`.
-- Nuevos usuarios se registran con un **token diario** del superadmin (se regenera cada día) o con un **PIN** emitido por el superadmin o el admin del grupo (rol jugador o administrador; si es PIN de grupo, el usuario entra al grupo automáticamente).
-- **Super admin**: panel `/admin` con token diario, generación de PINs, listado de grupos y usuarios.
-- **Admin de grupo**: crear/cerrar grupo y temporada, administrar jugadores, generar PINs, crear quedadas y registrar marcadores.
-- **Jugador**: ver su puesto en el ranking y editar sus datos personales (nombre, apellido, apodo, email, PIN).
+- **Set único sin fin**: un solo set corrido durante el tiempo de la ronda; gana la pareja con más puntos. No hay "al mejor de N".
 
 ## Flujo en la app
 
-1. Login o registro (PIN/token).
-2. Inicio: tus grupos y su temporada en curso.
-3. Grupo: clasificación, enlace directo a la quedada activa y (si eres admin) crear temporada/quedada y administrar jugadores.
-4. Quedada: una ronda por pantalla con navegación (‹ › y chips). El admin registra cada partido inline (marcador con − / +), sin salir de la pantalla, y puede editar resultados ya registrados.
+1. Login o registro por correo (magic link).
+2. Inicio: tus grupos, su código y su temporada en curso. Botones para **crear grupo** o **unirte con código**.
+3. Grupo: clasificación (con tu puesto), enlace directo a la quedada activa y (si eres admin) crear temporada/quedada y administrar jugadores.
+4. Quedada: una ronda por pantalla con navegación (‹ › y chips). El admin registra cada partido **inline** (marcador con − / +) y puede editar resultados ya registrados.
 5. Finalizar la quedada suma los puntos al ranking de la temporada.
 6. Cerrar la temporada → ganador calculado, solo lectura.
 
@@ -42,41 +50,47 @@ npm install
 # 1) Crea un proyecto en Supabase y pega supabase/schema.sql en el SQL editor.
 # 2) Crea las variables de entorno:
 cp .env.local.example .env.local
-#    Completa: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-#    SUPER_ADMIN_PIN, APP_TOKEN_SECRET
+#    Completa:
+#    - NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+#    - SUPER_ADMIN_PIN, SUPER_ADMIN_EMAIL
+#    - APP_URL (http://localhost:3000 en local)
+#    - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM (SMTP de OCI Email Delivery)
 npm run dev   # http://localhost:3000
 ```
 
-Primer acceso: usuario `superadmin` + `SUPER_ADMIN_PIN` (por defecto `0000`). **Cambia el PIN del superadmin** (Perfil → Cambiar PIN) y el `APP_TOKEN_SECRET` antes de producción.
+Primer acceso: pide el magic link para `SUPER_ADMIN_EMAIL`, o entra con PIN `superadmin` / `SUPER_ADMIN_PIN`.
 
 ## Deploy (Vercel)
 
-Importa el repo en Vercel y añade las mismas variables de entorno (Settings → Environment Variables). La PWA es instalable desde el navegador del teléfono.
+La app está desplegada en **https://pdpadel.vercel.app**. Importa el repo en Vercel y añade las mismas variables de entorno (Settings → Environment Variables), con `APP_URL` apuntando al dominio de producción. La PWA es instalable desde el navegador del teléfono.
 
 ## Estructura
 
 ```
 src/
   app/
-    login/ register/ admin/ profile/
-    api/auth/                  # bootstrap, login, register, session, logout, token, pins
-    groups/[id]/               # Grupo (server wrapper + GroupClient)
-      members/                 # administrar jugadores + generar PINs
+    login/ register/ auth/confirm/ auth/invite/ admin/ profile/
+    groups/join/                 # unirse con el código del grupo
+    groups/new/                  # crear grupo (quedas como admin)
+    groups/[id]/                 # Grupo (server wrapper + GroupClient)
+      members/                   # administrar jugadores + enlaces de invitación
       seasons/new/  seasons/[seasonId]/   # crear y ver temporada (clasificación, cerrar)
       quedadas/new/  quedadas/[qid]/      # crear quedada y marcador por rondas
-  components/                  # AppHeader, MatchCard, MatchScorer, StandingsTable
+    api/auth/                    # magic, invite, accept-invite, confirm, login, session, logout, bootstrap
+  components/                    # AppHeader, MatchCard, MatchScorer, StandingsTable
   lib/
-    matchmaking.ts             # round-robin (parejas + rivales)
-    points.ts                  # ranking por temporada
-    session.tsx                # sesión y roles
-    token.ts                   # token diario + PINs
-    audit.ts                   # trazabilidad
-    supabase/                  # clientes (browser y server)
-supabase/schema.sql            # esquema SQL + RLS
+    matchmaking.ts               # round-robin (parejas + rivales)
+    points.ts                    # ranking por temporada
+    session.tsx                  # sesión (SessionProvider) y helpers de rol
+    groupRoles.ts                # isGroupAdmin + códigos de grupo
+    magic.ts / mail.ts           # tokens de enlace y envío SMTP (nodemailer)
+    audit.ts                     # trazabilidad
+    supabase/                    # clientes (browser y server)
+supabase/schema.sql              # esquema SQL + RLS
 ```
 
 ## Seguridad
 
 - `.env.local` con credenciales reales está en `.gitignore`; solo se versiona `.env.local.example` (plantilla).
-- El `anon key` (publishable) es seguro para el navegador; el `sb_secret_`/service_role nunca debe exponerse.
-- RLS en Supabase está abierta a la llave anon: la autorización real la hace la app (sesión por PIN + roles). Para un uso público se debería endurecer RLS.
+- El `anon key` (publishable) es seguro para el navegador; el `sb_secret_`/service_role y las credenciales SMTP nunca deben exponerse (van solo en variables de entorno del servidor).
+- RLS en Supabase está abierta a la llave anon: la autorización real la hace la app (sesión por cookie + roles por grupo). Para un uso público se debería endurecer RLS.
