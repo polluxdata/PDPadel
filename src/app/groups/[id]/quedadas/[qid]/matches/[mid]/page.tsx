@@ -5,55 +5,57 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Check, Minus, Plus, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import {
-  DEFAULT_MAX_SETS,
-  DEFAULT_TARGET_SCORE,
-  SCORE_TARGETS,
-  SETS_OPTIONS,
-  WINNING_SETS,
-} from '@/lib/constants';
+import { useSession } from '@/lib/session';
+import { audit } from '@/lib/audit';
+import { WINNING_SETS } from '@/lib/constants';
 import { teamLabel } from '@/lib/utils';
-import type { MatchWithPlayers, SetDetail } from '@/lib/types';
+import type { MatchWithUsers, SetDetail, User } from '@/lib/types';
 
 const WIN_BY = 2;
 
 export default function ScoreboardPage() {
-  const params = useParams<{ matchId: string; id: string }>();
+  const params = useParams<{ id: string; qid: string; mid: string }>();
   const router = useRouter();
   const supabase = useRef(createClient()).current;
+  const { user } = useSession();
 
-  const [match, setMatch] = useState<MatchWithPlayers | null>(null);
+  const [match, setMatch] = useState<MatchWithUsers | null>(null);
   const [mode, setMode] = useState<'points' | 'sets'>('points');
-  const [target, setTarget] = useState(DEFAULT_TARGET_SCORE);
+  const [target, setTarget] = useState(31);
   const [score1, setScore1] = useState(0);
   const [score2, setScore2] = useState(0);
-  const [maxSets, setMaxSets] = useState(DEFAULT_MAX_SETS);
+  const [maxSets, setMaxSets] = useState(3);
   const [sets, setSets] = useState<SetDetail[]>([{ t1: 0, t2: 0 }]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*, p1:players!player1_id(*), p2:players!player2_id(*), p3:players!player3_id(*), p4:players!player4_id(*)')
-        .eq('id', params.matchId)
-        .single();
-      if (!error && data) {
-        const m = data as MatchWithPlayers;
-        setMatch(m);
-        setMode(m.mode);
-        setTarget(m.target_score);
-        setScore1(m.score_team1);
-        setScore2(m.score_team2);
-        setMaxSets(m.max_sets);
-        setSets(m.sets_details && m.sets_details.length > 0 ? m.sets_details : [{ t1: 0, t2: 0 }]);
+      const [{ data: m }, { data: q }] = await Promise.all([
+        supabase
+          .from('matches')
+          .select('*, p1:users!player1_id(*), p2:users!player2_id(*), p3:users!player3_id(*), p4:users!player4_id(*)')
+          .eq('id', params.mid)
+          .maybeSingle(),
+        supabase.from('quedadas').select('*').eq('id', params.qid).maybeSingle(),
+      ]);
+      const mm = (m ?? null) as MatchWithUsers | null;
+      const qd = (q ?? null) as { mode: 'points' | 'sets'; target_score: number; max_sets: number } | null;
+      if (mm) {
+        setMatch(mm);
+        setMode(qd?.mode ?? 'points');
+        setTarget(qd?.target_score ?? 31);
+        setScore1(mm.score_team1);
+        setScore2(mm.score_team2);
+        setMaxSets(qd?.max_sets ?? 3);
+        setSets(mm.sets_details && mm.sets_details.length > 0 ? mm.sets_details : [{ t1: 0, t2: 0 }]);
       }
       setLoading(false);
     })();
-  }, [supabase, params.matchId]);
+  }, [supabase, params.mid, params.qid]);
 
   const isDone = match?.status === 'completed' || match?.status === 'skipped';
+  const isAdmin = !!user && (user.role === 'super_admin' || user.role === 'admin');
 
   const setsWon1 = sets.filter((s) => s.t1 > s.t2).length;
   const setsWon2 = sets.filter((s) => s.t2 > s.t1).length;
@@ -66,16 +68,13 @@ export default function ScoreboardPage() {
         : null;
 
   const setsNeeded = WINNING_SETS(maxSets);
-  const setsWinner =
-    setsWon1 >= setsNeeded ? 1 : setsWon2 >= setsNeeded ? 2 : null;
-
+  const setsWinner = setsWon1 >= setsNeeded ? 1 : setsWon2 >= setsNeeded ? 2 : null;
   const winner = mode === 'points' ? pointsWinner : setsWinner;
 
   async function markInProgress() {
-    if (match && match.status === 'pending') {
-      await supabase.from('matches').update({ status: 'in_progress' }).eq('id', params.matchId);
-      setMatch({ ...match, status: 'in_progress' });
-    }
+    if (!user || !match || match.status !== 'pending') return;
+    await supabase.from('matches').update({ status: 'in_progress' }).eq('id', params.mid);
+    setMatch({ ...match, status: 'in_progress' });
   }
 
   function bumpScore(team: 1 | 2, delta: number) {
@@ -103,28 +102,29 @@ export default function ScoreboardPage() {
   }
 
   async function saveResult() {
-    if (!winner) return;
+    if (!winner || !user) return;
     setSaving(true);
     const patch = {
-      mode,
-      target_score: target,
-      max_sets: mode === 'sets' ? maxSets : DEFAULT_MAX_SETS,
       score_team1: mode === 'points' ? score1 : setsWon1,
       score_team2: mode === 'points' ? score2 : setsWon2,
       sets_details: mode === 'sets' ? sets : null,
       winner_team: winner,
       status: 'completed',
     };
-    const { error } = await supabase
-      .from('matches')
-      .update(patch)
-      .eq('id', params.matchId);
-    setSaving(false);
+    const { error } = await supabase.from('matches').update(patch).eq('id', params.mid);
     if (error) {
+      setSaving(false);
       alert('Error al guardar: ' + error.message);
       return;
     }
-    router.push(`/events/${params.id}`);
+    await audit(supabase, {
+      userId: user.id,
+      action: 'complete_match',
+      entity: 'match',
+      entityId: params.mid,
+      details: { ...patch },
+    });
+    router.push(`/groups/${params.id}/quedadas/${params.qid}`);
     router.refresh();
   }
 
@@ -144,7 +144,7 @@ export default function ScoreboardPage() {
       <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/90 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <Link
-            href={`/events/${params.id}`}
+            href={`/groups/${params.id}/quedadas/${params.qid}`}
             className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
             aria-label="Volver"
           >
@@ -158,15 +158,14 @@ export default function ScoreboardPage() {
       </header>
 
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-5">
-        {isDone ? (
-          <DoneView match={match} teamA={teamA} teamB={teamB} />
+        {!isAdmin && !isDone ? (
+          <p className="mt-10 text-center text-sm text-slate-400">
+            Solo el administrador puede ingresar marcadores.
+          </p>
+        ) : isDone ? (
+          <DoneView match={match} teamA={teamA} teamB={teamB} groupId={params.id} qid={params.qid} />
         ) : (
           <>
-            <div className="mb-5 flex gap-2">
-              <ModeButton active={mode === 'points'} onClick={() => setMode('points')} label="Puntos" />
-              <ModeButton active={mode === 'sets'} onClick={() => setMode('sets')} label="Sets" />
-            </div>
-
             {mode === 'points' ? (
               <PointsView
                 teamA={teamA}
@@ -219,52 +218,21 @@ export default function ScoreboardPage() {
   );
 }
 
-function ModeButton({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={
-        'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' +
-        (active
-          ? 'border-emerald-500 bg-emerald-500 text-slate-950'
-          : 'border-slate-700 bg-slate-900 text-slate-300')
-      }
-    >
-      {label}
-    </button>
-  );
-}
-
 function TeamScorePanel({
   name,
   score,
   accent,
   onBump,
-  sub,
 }: {
   name: string;
   score: number;
   accent: 'A' | 'B';
   onBump: (delta: number) => void;
-  sub?: React.ReactNode;
 }) {
-  const color =
-    accent === 'A'
-      ? 'border-sky-700 bg-sky-950/30'
-      : 'border-rose-700 bg-rose-950/30';
+  const color = accent === 'A' ? 'border-sky-700 bg-sky-950/30' : 'border-rose-700 bg-rose-950/30';
   return (
     <div className={`rounded-2xl border p-4 ${color}`}>
-      <p className="mb-2 line-clamp-2 min-h-10 text-center text-sm font-bold">
-        {name}
-      </p>
+      <p className="mb-2 line-clamp-2 min-h-10 text-center text-sm font-bold">{name}</p>
       <p className="text-center text-6xl font-black tabular-nums">{score}</p>
       <div className="mt-4 flex justify-center gap-3">
         <button
@@ -280,7 +248,6 @@ function TeamScorePanel({
           <Plus size={22} />
         </button>
       </div>
-      {sub}
     </div>
   );
 }
@@ -294,8 +261,8 @@ function PointsView({
   score2,
   onBump,
 }: {
-  teamA: Array<{ name: string } | null | undefined>;
-  teamB: Array<{ name: string } | null | undefined>;
+  teamA: Array<User | null | undefined>;
+  teamB: Array<User | null | undefined>;
   target: number;
   setTarget: (t: number) => void;
   score1: number;
@@ -307,15 +274,13 @@ function PointsView({
       <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5">
         <span className="text-sm text-slate-400">Meta</span>
         <div className="flex gap-1.5">
-          {SCORE_TARGETS.map((t) => (
+          {[21, 31, 50].map((t) => (
             <button
               key={t}
               onClick={() => setTarget(t)}
               className={
                 'rounded-lg px-3 py-1 text-sm font-bold transition ' +
-                (target === t
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'bg-slate-800 text-slate-300')
+                (target === t ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300')
               }
             >
               {t}
@@ -344,8 +309,8 @@ function SetsView({
   addSet,
   removeSet,
 }: {
-  teamA: Array<{ name: string } | null | undefined>;
-  teamB: Array<{ name: string } | null | undefined>;
+  teamA: Array<User | null | undefined>;
+  teamB: Array<User | null | undefined>;
   maxSets: number;
   setMaxSets: (n: number) => void;
   sets: SetDetail[];
@@ -361,15 +326,13 @@ function SetsView({
       <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5">
         <span className="text-sm text-slate-400">Al mejor de</span>
         <div className="flex gap-1.5">
-          {SETS_OPTIONS.map((n) => (
+          {[1, 3, 5].map((n) => (
             <button
               key={n}
               onClick={() => setMaxSets(n)}
               className={
                 'rounded-lg px-3 py-1 text-sm font-bold transition ' +
-                (maxSets === n
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'bg-slate-800 text-slate-300')
+                (maxSets === n ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300')
               }
             >
               {n}
@@ -382,38 +345,22 @@ function SetsView({
         <div className="rounded-2xl border border-sky-700 bg-sky-950/30 p-4 text-center">
           <p className="mb-2 text-sm font-bold">{teamLabel(teamA)}</p>
           <p className="text-6xl font-black tabular-nums">{setsWon1}</p>
-          <p className="mt-2 text-xs text-slate-400">
-            faltan {Math.max(0, setsNeeded - setsWon1)}
-          </p>
+          <p className="mt-2 text-xs text-slate-400">faltan {Math.max(0, setsNeeded - setsWon1)}</p>
         </div>
         <div className="rounded-2xl border border-rose-700 bg-rose-950/30 p-4 text-center">
           <p className="mb-2 text-sm font-bold">{teamLabel(teamB)}</p>
           <p className="text-6xl font-black tabular-nums">{setsWon2}</p>
-          <p className="mt-2 text-xs text-slate-400">
-            faltan {Math.max(0, setsNeeded - setsWon2)}
-          </p>
+          <p className="mt-2 text-xs text-slate-400">faltan {Math.max(0, setsNeeded - setsWon2)}</p>
         </div>
       </div>
 
       <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900 p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-semibold text-slate-300">Sets (detalle)</p>
-          <button
-            onClick={addSet}
-            disabled={sets.length >= maxSets}
-            className="btn-secondary !px-3 !py-1.5 text-xs"
-          >
-            <Plus size={14} />
-            Agregar set
+          <button onClick={addSet} disabled={sets.length >= maxSets} className="btn-secondary !px-3 !py-1.5 text-xs">
+            <Plus size={14} /> Agregar set
           </button>
         </div>
-
-        {sets.length === 0 && (
-          <p className="py-3 text-center text-xs text-slate-500">
-            Sin sets. Presiona “Agregar set”.
-          </p>
-        )}
-
         <div className="flex flex-col gap-2">
           {sets.map((s, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -454,17 +401,17 @@ function DoneView({
   match,
   teamA,
   teamB,
+  groupId,
+  qid,
 }: {
-  match: MatchWithPlayers;
-  teamA: Array<{ name: string } | null | undefined>;
-  teamB: Array<{ name: string } | null | undefined>;
+  match: MatchWithUsers;
+  teamA: Array<User | null | undefined>;
+  teamB: Array<User | null | undefined>;
+  groupId: string;
+  qid: string;
 }) {
   const winnerName =
-    match.winner_team === 1
-      ? teamLabel(teamA)
-      : match.winner_team === 2
-        ? teamLabel(teamB)
-        : null;
+    match.winner_team === 1 ? teamLabel(teamA) : match.winner_team === 2 ? teamLabel(teamB) : null;
 
   return (
     <div className="card flex flex-col items-center gap-4 py-10 text-center">
@@ -473,22 +420,19 @@ function DoneView({
           <Trophy size={40} className="text-amber-400" />
           <p className="text-2xl font-extrabold">¡{winnerName}!</p>
           <p className="text-sm text-slate-400">
-            {match.mode === 'points'
-              ? `${match.score_team1} – ${match.score_team2}`
-              : match.sets_details
-                ? `Sets ${match.sets_details.map((s) => `${s.t1}-${s.t2}`).join(', ')}`
-                : `${match.score_team1} – ${match.score_team2}`}
+            {match.sets_details
+              ? `Sets ${match.sets_details.map((s) => `${s.t1}-${s.t2}`).join(', ')}`
+              : `${match.score_team1} – ${match.score_team2}`}
           </p>
-          <Link href={`/events/${match.event_id}`} className="btn-primary mt-2 w-full">
-            <Check size={16} />
-            Volver a la jornada
+          <Link href={`/groups/${groupId}/quedadas/${qid}`} className="btn-primary mt-2 w-full">
+            <Check size={16} /> Volver a la quedada
           </Link>
         </>
       ) : (
         <>
           <p className="text-xl font-bold">Partido saltado</p>
-          <Link href={`/events/${match.event_id}`} className="btn-secondary w-full">
-            Volver a la jornada
+          <Link href={`/groups/${groupId}/quedadas/${qid}`} className="btn-secondary w-full">
+            Volver a la quedada
           </Link>
         </>
       )}

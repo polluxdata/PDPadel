@@ -6,8 +6,8 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasSession = req.cookies.has(SESSION_COOKIE);
 
-  if (pathname === '/login') {
-    if (hasSession) {
+  if (pathname === '/login' || pathname === '/register') {
+    if (hasSession && pathname === '/login') {
       return NextResponse.redirect(new URL('/', req.url));
     }
     return NextResponse.next();

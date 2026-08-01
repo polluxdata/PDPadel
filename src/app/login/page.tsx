@@ -1,16 +1,32 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
+import { Loader2, KeyRound, User } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [bootHint, setBootHint] = useState('');
+
+  useEffect(() => {
+    fetch('/api/auth/bootstrap', { method: 'POST' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.created) {
+          setBootHint(
+            `Primera vez: usuario "superadmin" creado. Usa el PIN configurado (SUPER_ADMIN_PIN).`
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,14 +36,15 @@ function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ username, pin }),
       });
+      const data = await res.json();
       if (res.ok) {
         const next = params.get('next') ?? '/';
         router.push(next);
         router.refresh();
       } else {
-        setError('PIN incorrecto. Inténtalo de nuevo.');
+        setError(data.error || 'No se pudo iniciar sesión.');
         setPin('');
       }
     } finally {
@@ -37,26 +54,51 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit} className="w-full max-w-xs">
-      <input
-        type="password"
-        inputMode="numeric"
-        autoComplete="current-password"
-        value={pin}
-        onChange={(e) => setPin(e.target.value)}
-        placeholder="PIN"
-        maxLength={8}
-        className="input text-center text-2xl tracking-[0.5em]"
-        autoFocus
-      />
+      {bootHint && (
+        <p className="mb-4 rounded-xl border border-emerald-700 bg-emerald-950/40 px-3 py-2 text-center text-xs text-emerald-300">
+          {bootHint}
+        </p>
+      )}
+      <div className="relative mb-3">
+        <User size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Usuario"
+          autoComplete="username"
+          className="input !pl-11"
+          autoFocus
+        />
+      </div>
+      <div className="relative">
+        <KeyRound size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+        <input
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          placeholder="PIN"
+          autoComplete="current-password"
+          maxLength={16}
+          className="input !pl-11"
+        />
+      </div>
       {error && <p className="mt-3 text-center text-sm text-rose-400">{error}</p>}
       <button
         type="submit"
-        disabled={loading || pin.length === 0}
+        disabled={loading || !username || !pin}
         className="btn-primary mt-4 w-full"
       >
         {loading && <Loader2 size={16} className="animate-spin" />}
         Entrar
       </button>
+      <p className="mt-4 text-center text-sm text-slate-400">
+        ¿No tienes cuenta?{' '}
+        <Link href="/register" className="font-semibold text-emerald-400">
+          Regístrate aquí
+        </Link>
+      </p>
     </form>
   );
 }

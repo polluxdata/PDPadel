@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { SessionProvider } from '@/lib/session';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased bg-slate-950 text-slate-100 min-h-dvh">
-        {children}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );

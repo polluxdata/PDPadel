@@ -2,24 +2,27 @@
 
 import Link from 'next/link';
 import { Play, X, CheckCircle2, Loader2 } from 'lucide-react';
-import type { MatchWithPlayers } from '@/lib/types';
+import type { MatchWithUsers } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/constants';
 import { teamLabel } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 export default function MatchCard({
   match,
+  groupId,
   onSkip,
   busy,
+  admin,
 }: {
-  match: MatchWithPlayers;
+  match: MatchWithUsers;
+  groupId: string;
   onSkip?: (id: string) => void;
   busy?: boolean;
+  admin?: boolean;
 }) {
   const teamA = [match.p1, match.p2];
   const teamB = [match.p3, match.p4];
   const done = match.status === 'completed' || match.status === 'skipped';
-  const skipBusy = busy;
 
   return (
     <div
@@ -55,7 +58,7 @@ export default function MatchCard({
           {match.status === 'completed' && (
             <span className="font-mono text-emerald-400">
               {match.score_team1}
-              {match.mode === 'sets' && match.sets_details
+              {match.sets_details
                 ? ` (${match.sets_details.map((s) => s.t1).join('-')})`
                 : ''}
             </span>
@@ -66,7 +69,7 @@ export default function MatchCard({
           {match.status === 'completed' && (
             <span className="font-mono text-emerald-400">
               {match.score_team2}
-              {match.mode === 'sets' && match.sets_details
+              {match.sets_details
                 ? ` (${match.sets_details.map((s) => s.t2).join('-')})`
                 : ''}
             </span>
@@ -74,10 +77,10 @@ export default function MatchCard({
         </div>
       </div>
 
-      {!done && (
+      {!done && admin && (
         <div className="flex gap-2">
           <Link
-            href={`/events/${match.event_id}/matches/${match.id}`}
+            href={`/groups/${groupId}/quedadas/${match.quedada_id}/matches/${match.id}`}
             className="btn-primary flex-1"
           >
             <Play size={16} />
@@ -86,10 +89,10 @@ export default function MatchCard({
           {onSkip && (
             <button
               onClick={() => onSkip(match.id)}
-              disabled={skipBusy}
+              disabled={busy}
               className="btn-secondary flex-1"
             >
-              {skipBusy ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
               Saltar
             </button>
           )}
