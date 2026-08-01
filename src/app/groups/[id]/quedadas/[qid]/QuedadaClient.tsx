@@ -10,6 +10,7 @@ import { useSession } from '@/lib/session';
 import { audit } from '@/lib/audit';
 import { displayName, formatDate } from '@/lib/utils';
 import { MODE_LABELS } from '@/lib/constants';
+import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, MatchWithUsers, Quedada, User } from '@/lib/types';
 
 export default function QuedadaClient({
@@ -25,6 +26,7 @@ export default function QuedadaClient({
   const [quedada, setQuedada] = useState<Quedada | null>(null);
   const [matches, setMatches] = useState<MatchWithUsers[]>([]);
   const [players, setPlayers] = useState<User[]>([]);
+  const [myRole, setMyRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
@@ -33,7 +35,7 @@ export default function QuedadaClient({
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [{ data: g }, { data: q }, { data: mt }, { data: qp }] =
+      const [{ data: g }, { data: q }, { data: mt }, { data: qp }, { data: mine }] =
         await Promise.all([
           supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
           supabase.from('quedadas').select('*').eq('id', quedadaId).maybeSingle(),
@@ -47,9 +49,18 @@ export default function QuedadaClient({
             .from('quedada_players')
             .select('user:users(*)')
             .eq('quedada_id', quedadaId),
+          user
+            ? supabase
+                .from('group_members')
+                .select('role')
+                .eq('group_id', groupId)
+                .eq('user_id', user.id)
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
         ]);
       if (g) setGroup(g as Group);
       if (q) setQuedada(q as Quedada);
+      if (mine) setMyRole((mine as { role?: string }).role ?? null);
       if (mt) setMatches(mt as MatchWithUsers[]);
       if (qp) {
         setPlayers(
@@ -64,14 +75,13 @@ export default function QuedadaClient({
     } finally {
       setLoading(false);
     }
-  }, [supabase, groupId, quedadaId]);
+  }, [supabase, groupId, quedadaId, user]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const isAdminHere =
-    !!user && (user.role === 'super_admin' || group?.admin_id === user.id);
+  const isAdminHere = isGroupAdmin(user, group, myRole);
 
   async function finishQuedada() {
     if (!quedada || !user) return;

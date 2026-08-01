@@ -10,6 +10,7 @@ import { useSession } from '@/lib/session';
 import { computeSeasonRanking } from '@/lib/points';
 import { formatDate } from '@/lib/utils';
 import { audit } from '@/lib/audit';
+import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, MatchWithUsers, Quedada, Season, User } from '@/lib/types';
 
 export default function SeasonClient({
@@ -26,6 +27,7 @@ export default function SeasonClient({
   const [members, setMembers] = useState<User[]>([]);
   const [quedadas, setQuedadas] = useState<Quedada[]>([]);
   const [matches, setMatches] = useState<MatchWithUsers[]>([]);
+  const [myRole, setMyRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
@@ -33,17 +35,27 @@ export default function SeasonClient({
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [{ data: g }, { data: s }, { data: gm }, { data: qs }] = await Promise.all([
-        supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
-        supabase.from('seasons').select('*').eq('id', seasonId).maybeSingle(),
-        supabase
-          .from('group_members')
-          .select('user:users(*)')
-          .eq('group_id', groupId),
-        supabase.from('quedadas').select('*').eq('season_id', seasonId).order('created_at'),
-      ]);
+      const [{ data: g }, { data: s }, { data: gm }, { data: qs }, { data: mine }] =
+        await Promise.all([
+          supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
+          supabase.from('seasons').select('*').eq('id', seasonId).maybeSingle(),
+          supabase
+            .from('group_members')
+            .select('user:users(*)')
+            .eq('group_id', groupId),
+          supabase.from('quedadas').select('*').eq('season_id', seasonId).order('created_at'),
+          user
+            ? supabase
+                .from('group_members')
+                .select('role')
+                .eq('group_id', groupId)
+                .eq('user_id', user.id)
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
+        ]);
       if (g) setGroup(g as Group);
       if (s) setSeason(s as Season);
+      if (mine) setMyRole((mine as { role?: string }).role ?? null);
       if (gm) {
         setMembers(
           ((gm as unknown as Array<{ user: User | null }>))
@@ -74,7 +86,7 @@ export default function SeasonClient({
     } finally {
       setLoading(false);
     }
-  }, [supabase, groupId, seasonId]);
+  }, [supabase, groupId, seasonId, user]);
 
   useEffect(() => {
     load();
@@ -85,8 +97,7 @@ export default function SeasonClient({
     ? members.find((m) => m.id === season.winner_id)
     : null;
 
-  const isAdminHere =
-    !!user && (user.role === 'super_admin' || group?.admin_id === user.id);
+  const isAdminHere = isGroupAdmin(user, group, myRole);
 
   async function closeSeason() {
     if (!season || !user) return;

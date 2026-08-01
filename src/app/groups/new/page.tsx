@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import { createClient } from '@/lib/supabase/client';
-import { useSession, isAdmin } from '@/lib/session';
+import { useSession } from '@/lib/session';
 import { audit } from '@/lib/audit';
+import { randomGroupCode } from '@/lib/groupRoles';
 
 export default function NewGroupPage() {
   const router = useRouter();
@@ -17,8 +18,8 @@ export default function NewGroupPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!loading && !isAdmin(user)) {
-      router.replace('/');
+    if (!loading && !user) {
+      router.replace('/login');
     }
   }, [loading, user, router]);
 
@@ -27,15 +28,34 @@ export default function NewGroupPage() {
     if (!user || !name.trim()) return;
     setSaving(true);
 
+    // Generar un código único para el grupo (reintenta si colisiona).
+    let code = '';
+    for (let i = 0; i < 5; i++) {
+      code = randomGroupCode();
+      const { data: exists } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('code', code)
+        .limit(1);
+      if (!exists || exists.length === 0) break;
+      code = '';
+    }
+    if (!code) {
+      setSaving(false);
+      alert('No se pudo generar un código único. Inténtalo de nuevo.');
+      return;
+    }
+
     const { data: group, error } = await supabase
       .from('groups')
       .insert({
         name: name.trim(),
+        code,
         description: description.trim() || null,
         admin_id: user.id,
         created_by: user.id,
       })
-      .select('id, name')
+      .select('id, name, code')
       .single();
 
     if (error || !group) {
@@ -44,7 +64,13 @@ export default function NewGroupPage() {
       return;
     }
 
-    await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id });
+    // El creador queda como administrador del grupo.
+    await supabase
+      .from('group_members')
+      .upsert(
+        { group_id: group.id, user_id: user.id, role: 'admin' },
+        { onConflict: 'group_id,user_id' }
+      );
     const { data: season } = await supabase
       .from('seasons')
       .insert({ group_id: group.id, name: 'Temporada 1', start_date: new Date().toISOString().slice(0, 10), created_by: user.id })
@@ -55,7 +81,7 @@ export default function NewGroupPage() {
       action: 'create_group',
       entity: 'group',
       entityId: group.id,
-      details: { name: group.name },
+      details: { name: group.name, code: group.code },
     });
     if (season) {
       await audit(supabase, {
@@ -102,8 +128,8 @@ export default function NewGroupPage() {
             />
           </div>
           <p className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-xs text-slate-400">
-            Al crear el grupo se crea automáticamente la primera temporada y tú
-            quedas como administrador.
+            Al crear el grupo quedas como administrador. Comparte el código del
+            grupo o un enlace de invitación para que otros se unan.
           </p>
           <button type="submit" disabled={saving || !name.trim()} className="btn-primary">
             {saving && <Loader2 size={16} className="animate-spin" />}

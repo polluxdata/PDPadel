@@ -32,9 +32,6 @@ export async function POST(req: NextRequest) {
 
   const isSuper = me.role === 'super_admin';
   if (!isSuper) {
-    if (me.role !== 'admin') {
-      return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 403 });
-    }
     const { data: group } = await supabase
       .from('groups')
       .select('admin_id')

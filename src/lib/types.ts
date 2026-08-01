@@ -9,6 +9,7 @@ export interface User {
   email: string | null;
   nickname: string | null;
   role: UserRole;
+  listed: boolean;
   is_active: boolean;
   created_by: string | null;
   created_at: string;
@@ -20,6 +21,7 @@ export type PublicUser = Omit<User, 'pin_hash'>;
 export interface Group {
   id: string;
   name: string;
+  code: string | null;
   description: string | null;
   admin_id: string | null;
   status: 'active' | 'closed';

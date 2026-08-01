@@ -23,7 +23,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Datos**: todo el fetch es cliente con `createClient()` (browser supabase). Patrón: `useCallback` + `load()` + `useEffect([load])`, con `try/catch/finally` y estado de `error` + botón Reintentar para nunca quedarse en "Cargando".
 - **Joins de partidos**: usar FK explícitas `p1:users!matches_player1_id_fkey(*)`, `p2:...player2_id...`, etc. (4 FK a la misma tabla; sin nombrarlas PostgREST puede resolver mal).
 - **Sesión**: `SessionProvider` en el root layout; `useSession()` expone `user`, `loading`, `refresh`. Helpers `isAdmin`, `isSuper`. Sesión por cookie httpOnly (`pdp_session`).
-- **Roles**: `super_admin`, `admin`, `player` (columna `users.role`). Los admin de grupo son usuarios con rol `admin`; `groups.admin_id` señala al dueño.
+- **Roles**: los roles son **por grupo** (`group_members.role` = `admin`|`player`). `users.role` solo distingue `super_admin` (control global); el resto son jugadores. `groups.admin_id` señala al dueño (admin irremovible). Ayudantes: `isGroupAdmin(user, group, membershipRole)` en `lib/groupRoles.ts`. Un usuario puede ser admin en un grupo y jugador en otro.
 
 ## Reglas de negocio clave
 
@@ -33,7 +33,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Puntos de ranking**: modo puntos = 2 pts por victoria; modo sets = 1 pt (`SETS_WIN_POINTS`). El marcador (pointsFor/Against) siempre suma a la diferencia de desempate; `sets_details` es legado opcional.
 - **Partidos**: no se pueden "saltar" (no hay botón). La quedada puede finalizar antes con "Finalizar quedada"; los pendientes no cuentan.
 - **Edición**: el admin puede editar resultados ya registrados (el marcador inline con "Guardar cambios"). `MatchScorer` sincroniza su estado con la prop `match` tras recargar.
-- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `issue_pin`, `register`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
+- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
 
 ## Matchmaking
 
@@ -43,13 +43,13 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 
 - Esquema completo en `supabase/schema.sql` (se corre en el SQL editor del dashboard).
 - RLS habilitada pero **permissiva** (la llave anon puede leer/escribir todo): la autorización la hace la app (sesión + roles). Endurecer RLS si pasa a uso público.
-- Tablas: `users`, `groups`, `group_members`, `seasons`, `quedadas`, `quedada_players`, `matches`, `registration_codes`, `audit_log`.
+- Tablas: `users`, `groups`, `group_members`, `seasons`, `quedadas`, `quedada_players`, `matches`, `magic_links`, `audit_log`.
 
 ## Variables de entorno
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (anon/publishable).
-- `SUPER_ADMIN_PIN` (PIN del usuario `superadmin`, se crea en bootstrap).
-- `APP_TOKEN_SECRET` (secreto HMAC del token diario de registro).
+- `SUPER_ADMIN_PIN` (PIN del usuario `superadmin`, se crea en bootstrap), `SUPER_ADMIN_EMAIL`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` (OCI Email Delivery), `APP_URL` (URL pública para enlaces).
 - Ver `.env.local.example`. `.env.local` real está en `.gitignore`.
 
 ## Observaciones / pendientes
@@ -59,12 +59,13 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Auth con magic link** (reemplaza PIN/token diario): **IMPLEMENTADO** (login, alta e invitación).
   - Login y alta por correo (enlace de verificación 15 min, un solo uso, tabla `magic_links`).
   - `users.email` pasa a ser único y obligatorio (índice único `users_email_unique`); `pin_hash` es opcional (usuarios de magic link no tienen PIN).
-  - El super admin entra con magic link (`SUPER_ADMIN_EMAIL`); desaparece `SUPER_ADMIN_PIN`. (PIN sigue como respaldo temporal.)
+  - El super admin entra con magic link (`SUPER_ADMIN_EMAIL`); `SUPER_ADMIN_PIN` queda como respaldo temporal.
   - SMTP: OCI Email Delivery en `lib/mail.ts` (nodemailer). Credenciales solo en vars de entorno, nunca `NEXT_PUBLIC_`.
-  - Endpoints: `POST /api/auth/magic` (login/signup/invite), `POST /api/auth/invite`, `POST /api/auth/accept-invite`, `GET /auth/confirm` (confirma y crea sesión), `GET /auth/invite` (pantalla para invitado: si está logueado acepta directo, si no pide email).
+  - Endpoints: `POST /api/auth/magic` (login/signup/invite), `POST /api/auth/invite`, `POST /api/auth/accept-invite`, `POST /api/auth/confirm` (confirma y crea sesión), `GET /auth/confirm` (página que confirma por POST), `GET /auth/invite` (pantalla para invitado: si está logueado acepta directo, si no pide email).
 - **Alta por invitación (Opción B)**: **IMPLEMENTADO** — el admin genera un **enlace de invitación** (grupo + rol, válido 7 días) y lo comparte por WhatsApp. El invitado lo abre, pone su email, recibe un magic link y queda dentro del grupo con el rol del enlace.
-- **Múltiples administradores por grupo**: **schema listo** (`group_members.role` = `admin`|`player`), **pendiente la UI** de promover/demover en Jugadores. El creador queda como dueño (`groups.admin_id`).
-- **Asignar administradores**: el **dueño** puede promover/demover admins (pantalla Jugadores). Los admins pueden invitar jugadores pero no nombrar/quitar otros admins. El super admin también puede nombrar admins. **Pendiente de implementar en la UI.**
+- **Múltiples administradores por grupo**: **IMPLEMENTADO** — roles por membresía (`group_members.role` = `admin`|`player`). El creador queda como dueño (`groups.admin_id`) y su membresía es `admin`. Pendiente: la UI de promover/demover admins en Jugadores (solo el dueño).
+- **Código de grupo**: cada grupo tiene un `code` único (6 chars) para unirse. Un usuario se une a un grupo con el código (rol jugador, página `/groups/join`) o con el enlace de invitación por WhatsApp (rol según el enlace). **IMPLEMENTADO**.
+- **Crear grupo**: cualquier usuario puede crear un grupo y queda como administrador de él. **IMPLEMENTADO**.
 - **Permisos de edición de marcadores**: **PENDIENTE**.
   - Quedada **abierta**: admins + dueño + super admin pueden registrar/editar.
   - Quedada **cerrada**: SOLO el super admin puede editar (al cerrarse se "congelan" los marcadores).
@@ -75,7 +76,6 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Seguridad**: el `sb_secret_`/service_role nunca debe ir al navegador. La `sb_secret_` compartida en conversación debería rotarse en Supabase.
 - **RLS abierta**: para producción multi-tenant conviene cerrar RLS por rol/sesión.
 - **Auditoría por app**: se inserta desde el cliente; si se requiere integridad fuerte, mover a triggers/función RPC de Supabase.
-- **Token diario**: se computa en `lib/token.ts` con HMAC de la fecha; no está en BD (se regenera cada día automáticamente).
 - **Modo sets**: la UI ya no usa `max_sets`/`sets_details`; quedan en el esquema como legado.
 - **`AGENTS.md`**: mantener actualizado al cambiar rutas, lógica de ranking o seguridad.
 

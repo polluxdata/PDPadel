@@ -13,6 +13,7 @@ function toPublic(u: PublicUser & { pin_hash?: string | null }): PublicUser {
     email: u.email,
     nickname: u.nickname,
     role: u.role,
+    listed: u.listed,
     is_active: u.is_active,
     created_by: u.created_by,
     created_at: u.created_at,

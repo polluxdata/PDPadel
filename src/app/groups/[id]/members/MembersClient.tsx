@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
 import { displayName } from '@/lib/utils';
 import { audit } from '@/lib/audit';
+import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, User } from '@/lib/types';
 
 export default function MembersClient({ groupId }: { groupId: string }) {
@@ -16,6 +17,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   const { user, loading } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<User[]>([]);
+  const [myRole, setMyRole] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
@@ -24,14 +26,23 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   const [generating, setGenerating] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: g }, { data: gm }] = await Promise.all([
+    const [{ data: g }, { data: gm }, { data: mine }] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
       supabase
         .from('group_members')
         .select('user:users(*)')
         .eq('group_id', groupId),
+      user
+        ? supabase
+            .from('group_members')
+            .select('role')
+            .eq('group_id', groupId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
     if (g) setGroup(g as Group);
+    if (mine) setMyRole((mine as { role?: string }).role ?? null);
     if (gm) {
       setMembers(
         ((gm as unknown as Array<{ user: User | null }>))
@@ -39,7 +50,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
           .filter(Boolean) as User[]
       );
     }
-  }, [supabase, groupId]);
+  }, [supabase, groupId, user]);
 
   useEffect(() => {
     load();
@@ -47,9 +58,10 @@ export default function MembersClient({ groupId }: { groupId: string }) {
 
   useEffect(() => {
     if (!loading && !user) return;
-    const isAdminHere = !!user && (user.role === 'super_admin' || group?.admin_id === user.id);
-    if (!loading && group && !isAdminHere) router.replace(`/groups/${groupId}`);
-  }, [loading, user, group, groupId, router]);
+    if (!loading && group && !isGroupAdmin(user, group, myRole)) {
+      router.replace(`/groups/${groupId}`);
+    }
+  }, [loading, user, group, myRole, groupId, router]);
 
   async function search(e: React.FormEvent) {
     e.preventDefault();
@@ -57,8 +69,9 @@ export default function MembersClient({ groupId }: { groupId: string }) {
     setSearching(true);
     const { data } = await supabase
       .from('users')
-      .select('id, username, first_name, last_name, email, nickname, role')
+      .select('id, username, first_name, last_name, email, nickname, role, listed')
       .ilike('username', `%${query.trim()}%`)
+      .eq('listed', true)
       .order('username')
       .limit(6);
     setResults((data ?? []) as User[]);

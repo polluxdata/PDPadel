@@ -19,8 +19,7 @@ export default function ProfilePage() {
     lastName: user?.last_name ?? '',
     email: user?.email ?? '',
     nickname: user?.nickname ?? '',
-    pin: '',
-    pin2: '',
+    listed: user?.listed ?? true,
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -32,13 +31,12 @@ export default function ProfilePage() {
         lastName: user.last_name ?? '',
         email: user.email ?? '',
         nickname: user.nickname ?? '',
-        pin: '',
-        pin2: '',
+        listed: user.listed ?? true,
       });
     }
   }, [user]);
 
-  function set<K extends keyof typeof form>(key: K, value: string) {
+  function set<K extends keyof typeof form>(key: K, value: string | boolean) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -46,21 +44,14 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!user) return;
     setMsg('');
-    if (form.pin && form.pin !== form.pin2) {
-      setMsg('Los PIN no coinciden.');
-      return;
-    }
     setSaving(true);
     const patch: Record<string, unknown> = {
       first_name: form.firstName,
       last_name: form.lastName,
       email: form.email || null,
       nickname: form.nickname || null,
+      listed: form.listed,
     };
-    if (form.pin) {
-      const bcrypt = await import('bcryptjs');
-      patch.pin_hash = await bcrypt.hash(form.pin, 10);
-    }
     const { error } = await supabase.from('users').update(patch).eq('id', user.id);
     if (error) {
       setMsg('Error al guardar: ' + error.message);
@@ -73,7 +64,6 @@ export default function ProfilePage() {
       entity: 'user',
       entityId: user.id,
     });
-    setForm((f) => ({ ...f, pin: '', pin2: '' }));
     setSaving(false);
     setMsg('Guardado correctamente.');
     await refresh();
@@ -128,17 +118,29 @@ export default function ProfilePage() {
           </div>
 
           <div className="card">
-            <p className="mb-2 text-sm font-semibold text-slate-300">Cambiar PIN de acceso</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Nuevo PIN</label>
-                <input type="password" inputMode="numeric" className="input" value={form.pin} onChange={(e) => set('pin', e.target.value)} />
-              </div>
-              <div>
-                <label className="label">Repite el PIN</label>
-                <input type="password" inputMode="numeric" className="input" value={form.pin2} onChange={(e) => set('pin2', e.target.value)} />
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => set('listed', !form.listed)}
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <span
+                className={
+                  'flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition ' +
+                  (form.listed ? 'justify-end bg-emerald-500' : 'justify-start bg-slate-700')
+                }
+              >
+                <span className="h-5 w-5 rounded-full bg-white" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-slate-200">
+                  Mostrarme en el listado de jugadores
+                </span>
+                <span className="block text-xs text-slate-400">
+                  Si lo desactivas, no apareces en la búsqueda para agregarte a
+                  grupos; solo puedes unirte con el código del grupo.
+                </span>
+              </span>
+            </button>
           </div>
 
           {msg && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { KeyRound, Copy, Shield, Users as UsersIcon, Loader2, Crown } from 'lucide-react';
+import { Copy, Shield, Users as UsersIcon, Loader2, Crown } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
 import { createClient } from '@/lib/supabase/client';
 import { useSession, isSuper } from '@/lib/session';
@@ -14,8 +14,6 @@ export default function AdminPanel() {
   const router = useRouter();
   const supabase = createClient();
   const { user, loading } = useSession();
-  const [token, setToken] = useState('');
-  const [tokenDate, setTokenDate] = useState('');
   const [groups, setGroups] = useState<Group[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [pinGroup, setPinGroup] = useState('');
@@ -30,15 +28,10 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!user || !isSuper(user)) return;
     (async () => {
-      const [tokenRes, { data: g }, { data: u }] = await Promise.all([
-        fetch('/api/auth/token').then((r) => (r.ok ? r.json() : null)),
+      const [{ data: g }, { data: u }] = await Promise.all([
         supabase.from('groups').select('*').order('name'),
         supabase.from('users').select('*').order('username'),
       ]);
-      if (tokenRes) {
-        setToken(tokenRes.token);
-        setTokenDate(tokenRes.date);
-      }
       if (g) setGroups(g as Group[]);
       if (u) setUsers(u as User[]);
     })();
@@ -72,29 +65,6 @@ export default function AdminPanel() {
       <AppHeader title="Panel de administración" backHref="/" />
 
       <main className="mx-auto max-w-lg px-4 py-5">
-        <section className="card mb-6">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
-            <KeyRound size={15} className="text-emerald-400" /> Token de registro diario
-          </h2>
-          <p className="mb-3 text-xs text-slate-500">
-            Se regenera cada día. Compártelo para que nuevos jugadores se den de
-            alta (rol jugador).
-          </p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 break-all rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-emerald-300">
-              {token}
-            </code>
-            <button
-              onClick={() => navigator.clipboard.writeText(token)}
-              className="btn-secondary !p-3"
-              aria-label="Copiar token"
-            >
-              <Copy size={16} />
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-slate-600">Válido para hoy ({tokenDate})</p>
-        </section>
-
         <section className="card mb-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
             <Crown size={15} className="text-amber-400" /> Generar enlace de invitación

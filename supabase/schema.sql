@@ -37,6 +37,7 @@ create index if not exists users_username_lower_idx on public.users (lower(usern
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
+  code text,
   description text,
   admin_id uuid references public.users(id) on delete set null,
   status text not null default 'active' check (status in ('active','closed')),
@@ -44,6 +45,7 @@ create table if not exists public.groups (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create unique index if not exists groups_code_unique on public.groups (code) where code is not null;
 
 create table if not exists public.group_members (
   id uuid primary key default gen_random_uuid(),
@@ -125,23 +127,9 @@ create table if not exists public.matches (
 create index if not exists matches_quedada_idx on public.matches (quedada_id);
 
 -- ============================================================
--- REGISTRATION CODES (PINs de invitación / tokens diarios)
--- ============================================================
-create table if not exists public.registration_codes (
-  id uuid primary key default gen_random_uuid(),
-  code text not null unique,
-  kind text not null default 'pin' check (kind in ('pin','token')),
-  group_id uuid references public.groups(id) on delete set null,
-  role text not null default 'player' check (role in ('admin','player')),
-  issued_by uuid references public.users(id) on delete set null,
-  used boolean not null default false,
-  expires_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
--- ============================================================
 -- MAGIC LINKS (login / alta / invitaciones por correo o WhatsApp)
 -- ============================================================
+drop table if exists public.registration_codes cascade;
 create table if not exists public.magic_links (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete cascade,
@@ -160,6 +148,10 @@ create index if not exists magic_links_token_idx on public.magic_links (token);
 -- email único (cuando exista) y rol por membresía (múltiples admins)
 create unique index if not exists users_email_unique on public.users (lower(email)) where email is not null;
 alter table public.group_members add column if not exists role text not null default 'player' check (role in ('admin','player'));
+
+-- Privacidad: si `listed` es false, el usuario no aparece en la búsqueda
+-- para ser agregado a grupos (solo puede unirse con el código).
+alter table public.users add column if not exists listed boolean not null default true;
 
 -- ============================================================
 -- AUDIT LOG (trazabilidad de quién hizo qué)
@@ -188,7 +180,6 @@ alter table public.seasons enable row level security;
 alter table public.quedadas enable row level security;
 alter table public.quedada_players enable row level security;
 alter table public.matches enable row level security;
-alter table public.registration_codes enable row level security;
 alter table public.magic_links enable row level security;
 alter table public.audit_log enable row level security;
 
@@ -197,7 +188,7 @@ declare t text;
 begin
   foreach t in array array[
     'users','groups','group_members','seasons','quedadas',
-    'quedada_players','matches','registration_codes','magic_links','audit_log'
+    'quedada_players','matches','magic_links','audit_log'
   ] loop
     execute format('create policy %I on public.%I for all using (true) with check (true)', t || '_all', t);
   end loop;

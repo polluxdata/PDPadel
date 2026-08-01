@@ -12,6 +12,7 @@ import { useSession } from '@/lib/session';
 import { computeSeasonRanking } from '@/lib/points';
 import { displayName } from '@/lib/utils';
 import { audit } from '@/lib/audit';
+import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, MatchWithUsers, Quedada, Season, User } from '@/lib/types';
 
 export default function GroupClient({ groupId }: { groupId: string }) {
@@ -19,6 +20,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   const { user } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<User[]>([]);
+  const [myRole, setMyRole] = useState<string | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
   const [matches, setMatches] = useState<MatchWithUsers[]>([]);
   const [quedadas, setQuedadas] = useState<Quedada[]>([]);
@@ -28,7 +30,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [{ data: g }, { data: gm }, { data: s }] = await Promise.all([
+      const [{ data: g }, { data: gm }, { data: s }, { data: mine }] = await Promise.all([
         supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
         supabase
           .from('group_members')
@@ -40,9 +42,18 @@ export default function GroupClient({ groupId }: { groupId: string }) {
           .eq('group_id', groupId)
           .eq('status', 'active')
           .maybeSingle(),
+        user
+          ? supabase
+              .from('group_members')
+              .select('role')
+              .eq('group_id', groupId)
+              .eq('user_id', user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
 
       if (g) setGroup(g as Group);
+      if (mine) setMyRole((mine as { role?: string }).role ?? null);
       if (gm) {
         setMembers(
           ((gm as unknown as Array<{ user: User | null }>))
@@ -84,7 +95,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [supabase, groupId]);
+  }, [supabase, groupId, user]);
 
   useEffect(() => {
     load();
@@ -93,9 +104,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   const rows = computeSeasonRanking(members, matches);
   const myRank = user ? rows.findIndex((r) => r.userId === user.id) + 1 : null;
 
-  const isAdminHere =
-    !!user &&
-    (user.role === 'super_admin' || group?.admin_id === user.id);
+  const isAdminHere = isGroupAdmin(user, group, myRole);
 
   async function closeGroup() {
     if (!group || !user) return;
@@ -146,7 +155,11 @@ export default function GroupClient({ groupId }: { groupId: string }) {
 
   return (
     <div>
-      <AppHeader title={group.name} subtitle={`${members.length} jugadores`} backHref="/" />
+      <AppHeader
+        title={group.name}
+        subtitle={`${members.length} jugadores · Código: ${group.code ?? '—'}`}
+        backHref="/"
+      />
 
       <main className="mx-auto max-w-lg px-4 py-5">
         {group.status === 'closed' && (

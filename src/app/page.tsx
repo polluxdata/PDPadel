@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Users, ChevronRight, Shield, Trophy, Plus, UserCircle2, CalendarClock } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
 import { createClient } from '@/lib/supabase/client';
-import { useSession, isSuper, isAdmin } from '@/lib/session';
+import { useSession, isSuper } from '@/lib/session';
 import { displayName, formatDate } from '@/lib/utils';
 import type { Group, Season } from '@/lib/types';
 
@@ -60,6 +60,22 @@ export default function HomePage() {
           ...g,
           myRole: g.admin_id === user.id ? 'admin' : 'member',
         }));
+
+        // Roles por grupo: marcar ADMIN si la membresía lo es.
+        if (!isSuper(user) && groupRows.length > 0) {
+          const { data: myRoles } = await supabase
+            .from('group_members')
+            .select('group_id, role')
+            .eq('user_id', user.id);
+          const roleByGroup = new Map(
+            ((myRoles ?? []) as Array<{ group_id: string; role: string }>).map(
+              (r) => [r.group_id, r.role]
+            )
+          );
+          for (const g of meta) {
+            if (roleByGroup.get(g.id) === 'admin') g.myRole = 'admin';
+          }
+        }
 
         if (groupRows.length > 0) {
           const { data: seasons } = await supabase
@@ -132,11 +148,14 @@ export default function HomePage() {
           <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
             <Users size={15} /> Mis grupos
           </h2>
-          {isAdmin(user) && (
+          <div className="flex gap-2">
+            <Link href="/groups/join" className="btn-secondary !px-3 !py-1.5 text-xs">
+              Unirme
+            </Link>
             <Link href="/groups/new" className="btn-primary !px-3 !py-1.5 text-xs">
               <Plus size={14} /> Nuevo grupo
             </Link>
-          )}
+          </div>
         </div>
 
         {loading ? (
@@ -146,15 +165,16 @@ export default function HomePage() {
             <Users size={26} className="text-slate-500" />
             <p className="text-sm text-slate-300">Aún no perteneces a ningún grupo</p>
             <p className="text-xs text-slate-500">
-              {isAdmin(user)
-                ? 'Crea un grupo o únete con un PIN de invitación.'
-                : 'Pide un PIN de invitación a un administrador.'}
+              Crea tu propio grupo o únete con el código que te compartan.
             </p>
-            {isAdmin(user) && (
-              <Link href="/groups/new" className="btn-primary mt-2">
+            <div className="mt-2 flex gap-2">
+              <Link href="/groups/join" className="btn-secondary">
+                Unirme con código
+              </Link>
+              <Link href="/groups/new" className="btn-primary">
                 Crear grupo
               </Link>
-            )}
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -190,6 +210,11 @@ export default function HomePage() {
                     {g.description || formatDate(g.created_at)}
                   </p>
                 </div>
+                {g.code && (
+                  <span className="shrink-0 rounded-md bg-slate-800 px-2 py-1 font-mono text-xs font-bold text-emerald-400">
+                    {g.code}
+                  </span>
+                )}
                 <ChevronRight size={18} className="shrink-0 text-slate-500" />
               </Link>
             ))}
