@@ -1,6 +1,6 @@
 {
-  "name": "PDPadel",
-  "short_name": "PDPadel",
+  "name": "PolluxPadel",
+  "short_name": "PPadel",
   "description": "Marcador y ranking de Pádel Americano",
   "start_url": "/",
   "display": "standalone",
@@ -10,17 +10,17 @@
   "lang": "es",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/app-logo-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/app-logo-512.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/app-logo-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

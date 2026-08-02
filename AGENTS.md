@@ -1,4 +1,4 @@
-# AGENTS.md — PDPadel
+# AGENTS.md — PolluxPadel
 
 Guía de contexto para agentes de IA que trabajen en este repositorio.
 
@@ -73,7 +73,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 
 ### Pendientes generales
 
-- **Seguridad**: el `sb_secret_`/service_role nunca debe ir al navegador. La `sb_secret_` compartida en conversación debería rotarse en Supabase.
+- **Seguridad**: el `sb_secret_`/service_role nunca debe ir al navegador. Si alguna llave de servicio se llegó a exponer, rotarla en Supabase.
 - **RLS abierta**: para producción multi-tenant conviene cerrar RLS por rol/sesión.
 - **Auditoría por app**: se inserta desde el cliente; si se requiere integridad fuerte, mover a triggers/función RPC de Supabase.
 - **Modo sets**: la UI ya no usa `max_sets`/`sets_details`; quedan en el esquema como legado.

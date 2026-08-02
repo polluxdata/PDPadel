@@ -1,4 +1,4 @@
-# PDPadel
+# PolluxPadel
 
 PWA de **Pádel Americano**: grupos de jugadores, temporadas, quedadas y ranking en vivo.
 Mobile-first (Next.js 14 + TypeScript + Tailwind CSS + Supabase), instalable y desplegada en Vercel.
@@ -62,7 +62,7 @@ Primer acceso: pide el magic link para `SUPER_ADMIN_EMAIL`, o entra con PIN `sup
 
 ## Deploy (Vercel)
 
-La app está desplegada en **https://pdpadel.vercel.app**. Importa el repo en Vercel y añade las mismas variables de entorno (Settings → Environment Variables), con `APP_URL` apuntando al dominio de producción. La PWA es instalable desde el navegador del teléfono.
+La app está desplegada en **https://ppadel.polluxdata.com**. Importa el repo en Vercel y añade las mismas variables de entorno (Settings → Environment Variables), con `APP_URL` apuntando al dominio de producción. La PWA es instalable desde el navegador del teléfono.
 
 ## Estructura
 
@@ -91,6 +91,7 @@ supabase/schema.sql              # esquema SQL + RLS
 
 ## Seguridad
 
-- `.env.local` con credenciales reales está en `.gitignore`; solo se versiona `.env.local.example` (plantilla).
-- El `anon key` (publishable) es seguro para el navegador; el `sb_secret_`/service_role y las credenciales SMTP nunca deben exponerse (van solo en variables de entorno del servidor).
-- RLS en Supabase está abierta a la llave anon: la autorización real la hace la app (sesión por cookie + roles por grupo). Para un uso público se debería endurecer RLS.
+- Las credenciales reales van en variables de entorno (`.env.local`, gitignoreado); solo se versiona `.env.local.example` como plantilla.
+- Claves de servidor (`service_role`/`sb_secret_`) y credenciales SMTP nunca van al navegador ni se versionan; se usan solo en endpoints del servidor vía variables de entorno.
+- El esquema y las políticas RLS de Supabase están en `supabase/schema.sql`.
+

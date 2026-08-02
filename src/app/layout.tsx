@@ -3,17 +3,17 @@ import { SessionProvider } from '@/lib/session';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PDPadel',
+  title: 'PolluxPadel',
   description: 'Marcador y ranking de Pádel Americano',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    title: 'PDPadel',
+    title: 'PolluxPadel',
     statusBarStyle: 'black-translucent',
   },
   icons: {
-    icon: '/icons/icon-192.png',
-    apple: '/icons/icon-192.png',
+    icon: '/favicon.png',
+    apple: '/icons/app-logo-192.png',
   },
 };
 

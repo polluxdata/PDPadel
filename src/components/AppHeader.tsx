@@ -1,8 +1,9 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogOut, Plus, UserCircle2, Home } from 'lucide-react';
+import { ArrowLeft, LogOut, Plus, UserCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function AppHeader({
@@ -36,16 +37,26 @@ export default function AppHeader({
             <ArrowLeft size={18} />
           </Link>
         ) : (
-          <Link
-            href="/"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
-            aria-label="Inicio"
-          >
-            <Home size={18} />
+          <Link href="/" aria-label="Inicio" className="shrink-0">
+            <Image
+              src="/icons/app-logo-192.png"
+              alt="PolluxPadel"
+              width={44}
+              height={44}
+              className="rounded-xl ring-1 ring-orange-500/40"
+            />
           </Link>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-bold leading-tight">{title}</h1>
+          <h1 className="truncate text-lg font-extrabold tracking-tight leading-tight">
+            {title === 'PolluxPadel' ? (
+              <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(249,115,22,0.45)]">
+                PolluxPadel
+              </span>
+            ) : (
+              title
+            )}
+          </h1>
           {subtitle && (
             <p className="truncate text-xs text-slate-400">{subtitle}</p>
           )}

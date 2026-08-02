@@ -1,4 +1,4 @@
-export const APP_NAME = 'PDPadel';
+export const APP_NAME = 'PolluxPadel';
 
 export const MIN_COURTS = 1;
 export const MAX_COURTS = 5;

@@ -130,13 +130,13 @@ export async function POST(req: NextRequest) {
   const url = confirmUrl(token);
   const subject =
     mode === 'signup'
-      ? 'Confirma tu registro en PDPadel'
+      ? 'Confirma tu registro en PolluxPadel'
       : mode === 'invite'
-        ? 'Te invitaron a un grupo de PDPadel'
-        : 'Tu enlace de acceso a PDPadel';
+        ? 'Te invitaron a un grupo de PolluxPadel'
+        : 'Tu enlace de acceso a PolluxPadel';
   const html = `
     <p>Hola,</p>
-    <p>Toca el siguiente enlace para ${mode === 'signup' ? 'completar tu registro' : mode === 'invite' ? 'unirte al grupo' : 'iniciar sesión'} en PDPadel:</p>
+    <p>Toca el siguiente enlace para ${mode === 'signup' ? 'completar tu registro' : mode === 'invite' ? 'unirte al grupo' : 'iniciar sesión'} en PolluxPadel:</p>
     <p><a href="${url}">${url}</a></p>
     <p>El enlace vence en 15 minutos y es de un solo uso.</p>
   `;

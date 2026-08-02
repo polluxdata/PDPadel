@@ -87,7 +87,7 @@ export default function RegisterPage() {
           <CheckCircle2 size={32} className="mx-auto mb-2 text-orange-400" />
           <p className="text-lg font-extrabold text-orange-300">Revisa tu correo</p>
           <p className="mt-2 max-w-xs text-sm text-slate-400">
-            Te enviamos un enlace para confirmar tu registro en PDPadel. Vence en
+            Te enviamos un enlace para confirmar tu registro en PolluxPadel. Vence en
             15 minutos.
           </p>
           <Link href="/login" className="btn-ghost mt-4 w-full !py-2 text-xs">

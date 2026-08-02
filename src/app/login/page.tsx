@@ -112,14 +112,16 @@ export default function LoginPage() {
       <div className="relative mb-8 w-full max-w-xs text-center">
         <Image
           src="/portada.png"
-          alt="PDPadel"
-          width={830}
-          height={1220}
+          alt="PolluxPadel"
+          width={861}
+          height={1090}
           priority
           className="mx-auto mb-5 h-auto w-full rounded-3xl border border-orange-500/20 shadow-lg shadow-orange-500/10"
         />
-        <h1 className="text-3xl font-extrabold tracking-tight">PDPadel</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent drop-shadow-[0_0_10px_rgba(249,115,22,0.45)]">
+          PolluxPadel
+        </h1>
+        <p className="mt-1.5 text-sm font-medium text-orange-300/90">
           Marcador y ranking de Pádel Americano
         </p>
       </div>

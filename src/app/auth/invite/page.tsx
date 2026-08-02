@@ -59,7 +59,7 @@ function InviteForm() {
           <Users size={26} className="text-orange-400" />
         </div>
       </div>
-      <h1 className="mb-2 text-center text-xl font-extrabold">Te invitaron a PDPadel</h1>
+      <h1 className="mb-2 text-center text-xl font-extrabold">Te invitaron a PolluxPadel</h1>
 
       {sent ? (
         <div className="rounded-xl border border-orange-700 bg-orange-950/30 p-5 text-center">

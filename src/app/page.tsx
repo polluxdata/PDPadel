@@ -101,7 +101,7 @@ export default function HomePage() {
   if (sessionLoading || (loading && !user)) {
     return (
       <div>
-        <AppHeader title="PDPadel" />
+        <AppHeader title="PolluxPadel" />
         <p className="py-10 text-center text-sm text-slate-400">Cargando…</p>
       </div>
     );
@@ -111,7 +111,7 @@ export default function HomePage() {
 
   return (
     <div className="pb-20">
-      <AppHeader title="PDPadel" />
+      <AppHeader title="PolluxPadel" />
 
       <main className="mx-auto max-w-lg px-4 py-5">
         <div className="mb-6 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4">
