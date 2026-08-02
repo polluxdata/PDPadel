@@ -11,12 +11,17 @@ import { audit } from '@/lib/audit';
 import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, User } from '@/lib/types';
 
+export interface MemberRow {
+  user: User;
+  role: string;
+}
+
 export default function MembersClient({ groupId }: { groupId: string }) {
   const router = useRouter();
   const supabase = useRef(createClient()).current;
   const { user, loading } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<User[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
@@ -24,13 +29,14 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   const [pinRole, setPinRole] = useState<'player' | 'admin'>('player');
   const [invite, setInvite] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [changing, setChanging] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [{ data: g }, { data: gm }, { data: mine }] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
       supabase
         .from('group_members')
-        .select('user:users(*)')
+        .select('role, user:users(*)')
         .eq('group_id', groupId),
       user
         ? supabase
@@ -45,9 +51,9 @@ export default function MembersClient({ groupId }: { groupId: string }) {
     if (mine) setMyRole((mine as { role?: string }).role ?? null);
     if (gm) {
       setMembers(
-        ((gm as unknown as Array<{ user: User | null }>))
-          .map((r) => r.user)
-          .filter(Boolean) as User[]
+        ((gm as unknown as Array<{ role: string; user: User | null }>))
+          .map((r) => (r.user ? { user: r.user, role: r.role } : null))
+          .filter(Boolean) as MemberRow[]
       );
     }
   }, [supabase, groupId, user]);
@@ -112,6 +118,28 @@ export default function MembersClient({ groupId }: { groupId: string }) {
       entity: 'group_member',
       details: { group_id: groupId, user_id: member.id },
     });
+    await load();
+  }
+
+  // Solo el dueño (o el super admin) puede cambiar roles.
+  const canManageRoles =
+    !!user && (user.role === 'super_admin' || group?.admin_id === user.id);
+
+  async function changeRole(member: User, role: 'admin' | 'player') {
+    if (!user || !canManageRoles) return;
+    setChanging(member.id);
+    await supabase
+      .from('group_members')
+      .update({ role })
+      .eq('group_id', groupId)
+      .eq('user_id', member.id);
+    await audit(supabase, {
+      userId: user.id,
+      action: 'change_role',
+      entity: 'group_member',
+      details: { group_id: groupId, user_id: member.id, role },
+    });
+    setChanging(null);
     await load();
   }
 
@@ -243,33 +271,53 @@ export default function MembersClient({ groupId }: { groupId: string }) {
             Miembros ({members.length})
           </h2>
           <div className="flex flex-col gap-2">
-            {members.map((m) => (
-              <div key={m.id} className="card flex items-center gap-3 !p-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-emerald-400">
-                  {displayName(m).slice(0, 1).toUpperCase()}
+            {members.map((m) => {
+              const isOwner = group.admin_id === m.user.id;
+              const isAdmin = isOwner || m.role === 'admin';
+              return (
+                <div key={m.user.id} className="card flex items-center gap-3 !p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-emerald-400">
+                    {displayName(m.user).slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {displayName(m.user)}
+                      {isAdmin && (
+                        <span className="ml-1.5 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                          {isOwner ? 'ADMIN (dueño)' : 'ADMIN'}
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">@{m.user.username}</p>
+                  </div>
+
+                  {canManageRoles && !isOwner && (
+                    <button
+                      onClick={() => changeRole(m.user, isAdmin ? 'player' : 'admin')}
+                      disabled={changing === m.user.id}
+                      className={
+                        isAdmin
+                          ? 'btn-secondary !px-3 !py-1.5 text-xs'
+                          : 'btn-primary !px-3 !py-1.5 text-xs'
+                      }
+                    >
+                      {changing === m.user.id && <Loader2 size={14} className="animate-spin" />}
+                      {isAdmin ? 'Quitar admin' : 'Hacer admin'}
+                    </button>
+                  )}
+
+                  {!isOwner && user?.id !== m.user.id && (
+                    <button
+                      onClick={() => removeMember(m.user)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-rose-400 hover:bg-slate-800"
+                      aria-label={`Quitar a ${m.user.username}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {displayName(m)}
-                    {group.admin_id === m.id && (
-                      <span className="ml-1.5 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-                        ADMIN
-                      </span>
-                    )}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">@{m.username}</p>
-                </div>
-                {m.id !== group.admin_id && user?.id !== m.id && (
-                  <button
-                    onClick={() => removeMember(m)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-rose-400 hover:bg-slate-800"
-                    aria-label={`Quitar a ${m.username}`}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </main>

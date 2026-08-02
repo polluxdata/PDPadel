@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
@@ -206,20 +207,32 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-950 px-6">
-      <div className="mb-8 text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500 text-2xl font-black text-slate-950">
-          P
-        </div>
-        <h1 className="text-2xl font-extrabold">PDPadel</h1>
+    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-slate-950 px-6">
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 right-0 h-64 w-64 rounded-full bg-teal-500/10 blur-3xl" />
+
+      <div className="relative mb-8 text-center">
+        <Image
+          src="/icons/icon-192.png"
+          alt="PDPadel"
+          width={96}
+          height={96}
+          priority
+          className="mx-auto mb-4 rounded-3xl shadow-lg shadow-emerald-500/20"
+        />
+        <h1 className="text-3xl font-extrabold tracking-tight">
+          PDPadel
+        </h1>
         <p className="mt-1 text-sm text-slate-400">
           Marcador y ranking de Pádel Americano
         </p>
       </div>
 
-      <Suspense fallback={null}>
-        <LoginForm />
-      </Suspense>
+      <div className="relative w-full max-w-xs">
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
+      </div>
     </main>
   );
 }

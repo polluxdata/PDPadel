@@ -19,7 +19,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   const supabase = useRef(createClient()).current;
   const { user } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<User[]>([]);
+  const [members, setMembers] = useState<Array<{ user: User; role: string }>>([]);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
   const [matches, setMatches] = useState<MatchWithUsers[]>([]);
@@ -34,7 +34,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
         supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
         supabase
           .from('group_members')
-          .select('user:users(*)')
+          .select('role, user:users(*)')
           .eq('group_id', groupId),
         supabase
           .from('seasons')
@@ -56,9 +56,9 @@ export default function GroupClient({ groupId }: { groupId: string }) {
       if (mine) setMyRole((mine as { role?: string }).role ?? null);
       if (gm) {
         setMembers(
-          ((gm as unknown as Array<{ user: User | null }>))
-            .map((r) => r.user)
-            .filter(Boolean) as User[]
+          ((gm as unknown as Array<{ role: string; user: User | null }>))
+            .map((r) => (r.user ? { user: r.user, role: r.role } : null))
+            .filter(Boolean) as Array<{ user: User; role: string }>
         );
       }
       if (s) {
@@ -101,7 +101,10 @@ export default function GroupClient({ groupId }: { groupId: string }) {
     load();
   }, [load]);
 
-  const rows = computeSeasonRanking(members, matches);
+  const rows = computeSeasonRanking(
+    members.map((m) => m.user),
+    matches
+  );
   const myRank = user ? rows.findIndex((r) => r.userId === user.id) + 1 : null;
 
   const isAdminHere = isGroupAdmin(user, group, myRole);
@@ -265,20 +268,28 @@ export default function GroupClient({ groupId }: { groupId: string }) {
             <Users size={15} /> Jugadores del grupo
           </h3>
           <div className="flex flex-col gap-2">
-            {members.map((m) => (
-              <div key={m.id} className="card flex items-center gap-3 !p-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-emerald-400">
-                  {displayName(m).slice(0, 1).toUpperCase()}
+            {members.map((m) => {
+              const isOwner = group.admin_id === m.user.id;
+              const isAdmin = isOwner || m.role === 'admin';
+              return (
+                <div key={m.user.id} className="card flex items-center gap-3 !p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-emerald-400">
+                    {displayName(m.user).slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {displayName(m.user)}
+                      {isAdmin && (
+                        <span className="ml-1.5 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                          ADMIN{isOwner ? ' (dueño)' : ''}
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">@{m.user.username}</p>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{displayName(m)}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    @{m.username}
-                    {group.admin_id === m.id ? ' · Admin' : ''}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </main>
