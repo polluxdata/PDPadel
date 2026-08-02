@@ -115,7 +115,7 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-lg px-4 py-5">
         <div className="mb-6 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-lg font-black text-slate-950">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500 text-lg font-black text-slate-950">
             {displayName(user).slice(0, 1).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -188,7 +188,7 @@ export default function HomePage() {
                   <p className="flex items-center gap-2 truncate font-semibold">
                     {g.name}
                     {g.myRole === 'admin' && (
-                      <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                      <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
                         ADMIN
                       </span>
                     )}
@@ -211,7 +211,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 {g.code && (
-                  <span className="shrink-0 rounded-md bg-slate-800 px-2 py-1 font-mono text-xs font-bold text-emerald-400">
+                  <span className="shrink-0 rounded-md bg-slate-800 px-2 py-1 font-mono text-xs font-bold text-orange-400">
                     {g.code}
                   </span>
                 )}

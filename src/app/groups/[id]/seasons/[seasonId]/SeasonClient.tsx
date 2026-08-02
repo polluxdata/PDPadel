@@ -179,7 +179,7 @@ export default function SeasonClient({
             className={
               'rounded-full px-3 py-1 text-xs font-bold ' +
               (season.status === 'active'
-                ? 'bg-emerald-500/20 text-emerald-300'
+                ? 'bg-orange-500/20 text-orange-300'
                 : 'bg-slate-700 text-slate-400')
             }
           >
@@ -250,7 +250,7 @@ export default function SeasonClient({
                       <span
                         className={
                           'rounded-full px-2 py-0.5 text-[10px] font-bold ' +
-                          (done ? 'bg-slate-700 text-slate-400' : 'bg-emerald-500/20 text-emerald-300')
+                          (done ? 'bg-slate-700 text-slate-400' : 'bg-orange-500/20 text-orange-300')
                         }
                       >
                         {done ? 'Jugada' : 'Activa'}

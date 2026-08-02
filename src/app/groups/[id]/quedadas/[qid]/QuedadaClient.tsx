@@ -190,7 +190,7 @@ export default function QuedadaClient({
       <main className="mx-auto max-w-lg px-4 py-5">
         <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5">
           <span className="flex items-center gap-2 text-xs text-slate-400">
-            <Users size={14} className="text-emerald-400" />
+            <Users size={14} className="text-orange-400" />
             {players.map(displayName).join(', ')}
           </span>
         </div>
@@ -207,7 +207,7 @@ export default function QuedadaClient({
           <>
             <div className="mb-5 grid grid-cols-2 gap-3">
               <div className="card text-center">
-                <p className="text-2xl font-extrabold text-emerald-400">{done}/{total}</p>
+                <p className="text-2xl font-extrabold text-orange-400">{done}/{total}</p>
                 <p className="text-xs text-slate-400">Partidos jugados</p>
               </div>
               <div className="card text-center">
@@ -258,9 +258,9 @@ export default function QuedadaClient({
                         className={
                           'flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold transition ' +
                           (round === activeRound
-                            ? 'bg-emerald-500 text-slate-950'
+                            ? 'bg-orange-500 text-slate-950'
                             : allDone
-                              ? 'bg-emerald-500/20 text-emerald-300'
+                              ? 'bg-orange-500/20 text-orange-300'
                               : 'bg-slate-800 text-slate-400')
                         }
                       >

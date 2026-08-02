@@ -85,7 +85,7 @@ export default function ProfilePage() {
 
       <main className="mx-auto max-w-lg px-4 py-5">
         <div className="card mb-5 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-lg font-black text-slate-950">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500 text-lg font-black text-slate-950">
             {displayName(user).slice(0, 1).toUpperCase()}
           </div>
           <div>
@@ -126,7 +126,7 @@ export default function ProfilePage() {
               <span
                 className={
                   'flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition ' +
-                  (form.listed ? 'justify-end bg-emerald-500' : 'justify-start bg-slate-700')
+                  (form.listed ? 'justify-end bg-orange-500' : 'justify-start bg-slate-700')
                 }
               >
                 <span className="h-5 w-5 rounded-full bg-white" />
@@ -144,7 +144,7 @@ export default function ProfilePage() {
           </div>
 
           {msg && (
-            <p className={'text-sm ' + (msg.includes('coinciden') || msg.includes('Error') ? 'text-rose-400' : 'text-emerald-400')}>
+            <p className={'text-sm ' + (msg.includes('coinciden') || msg.includes('Error') ? 'text-rose-400' : 'text-orange-400')}>
               {msg}
             </p>
           )}

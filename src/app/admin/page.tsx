@@ -68,7 +68,7 @@ export default function AdminPanel() {
               <div key={g.id} className="card flex items-center justify-between gap-2 !p-3">
                 <Link
                   href={`/groups/${g.id}`}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold hover:text-emerald-400"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold hover:text-orange-400"
                 >
                   <span className="truncate">{g.name}</span>
                   <LogIn size={13} className="shrink-0 text-slate-500" />
@@ -298,7 +298,7 @@ function UsersAdmin() {
                   {(m?.adminIn.length || m?.playerIn.length) ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {m?.adminIn.map((g) => (
-                        <span key={'a' + g} className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                        <span key={'a' + g} className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-300">
                           Admin · {g}
                         </span>
                       ))}

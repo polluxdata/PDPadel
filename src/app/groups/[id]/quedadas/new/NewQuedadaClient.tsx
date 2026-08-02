@@ -182,7 +182,7 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
                     className={
                       'flex-1 rounded-xl border py-2.5 text-center font-semibold transition ' +
                       (courts === n
-                        ? 'border-emerald-500 bg-emerald-500 text-slate-950'
+                        ? 'border-orange-500 bg-orange-500 text-slate-950'
                         : 'border-slate-700 bg-slate-800 text-slate-300')
                     }
                   >
@@ -208,11 +208,11 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
               <label className="label">Formato</label>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setMode('points')}
-                  className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (mode === 'points' ? 'border-emerald-500 bg-emerald-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
+                  className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (mode === 'points' ? 'border-orange-500 bg-orange-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
                   Puntos
                 </button>
                 <button type="button" onClick={() => setMode('sets')}
-                  className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (mode === 'sets' ? 'border-emerald-500 bg-emerald-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
+                  className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (mode === 'sets' ? 'border-orange-500 bg-orange-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
                   Sets
                 </button>
               </div>
@@ -222,7 +222,7 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
                   <div className="flex gap-1.5">
                     {SCORE_TARGETS.map((t) => (
                       <button key={t} type="button" onClick={() => setTarget(t)}
-                        className={'rounded-lg px-3 py-1 text-sm font-bold ' + (target === t ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300')}>
+                        className={'rounded-lg px-3 py-1 text-sm font-bold ' + (target === t ? 'bg-orange-500 text-slate-950' : 'bg-slate-800 text-slate-300')}>
                         {t}
                       </button>
                     ))}
@@ -243,7 +243,7 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
               <span
                 className={cn(
                   'font-mono text-sm font-bold',
-                  selected.size === needed ? 'text-emerald-400' : 'text-amber-400'
+                  selected.size === needed ? 'text-orange-400' : 'text-amber-400'
                 )}
               >
                 {selected.size}/{needed}
@@ -260,14 +260,14 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
                     className={cn(
                       'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition',
                       on
-                        ? 'border-emerald-500 bg-emerald-500/10'
+                        ? 'border-orange-500 bg-orange-500/10'
                         : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                     )}
                   >
                     <span
                       className={cn(
                         'flex h-5 w-5 items-center justify-center rounded border text-[10px] font-bold',
-                        on ? 'border-emerald-400 bg-emerald-500 text-slate-950' : 'border-slate-600 text-transparent'
+                        on ? 'border-orange-400 bg-orange-500 text-slate-950' : 'border-slate-600 text-transparent'
                       )}
                     >
                       ✓

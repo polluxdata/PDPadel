@@ -55,16 +55,16 @@ function InviteForm() {
   return (
     <div className="w-full max-w-xs">
       <div className="mb-6 flex justify-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20">
-          <Users size={26} className="text-emerald-400" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/20">
+          <Users size={26} className="text-orange-400" />
         </div>
       </div>
       <h1 className="mb-2 text-center text-xl font-extrabold">Te invitaron a PDPadel</h1>
 
       {sent ? (
-        <div className="rounded-xl border border-emerald-700 bg-emerald-950/30 p-5 text-center">
-          <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-400" />
-          <p className="text-sm font-semibold text-emerald-300">Revisa tu correo</p>
+        <div className="rounded-xl border border-orange-700 bg-orange-950/30 p-5 text-center">
+          <CheckCircle2 size={28} className="mx-auto mb-2 text-orange-400" />
+          <p className="text-sm font-semibold text-orange-300">Revisa tu correo</p>
           <p className="mt-1 text-xs text-slate-400">
             Te enviamos el enlace para unirte al grupo. Vence en 15 minutos.
           </p>

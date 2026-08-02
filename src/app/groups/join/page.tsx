@@ -80,7 +80,7 @@ export default function JoinGroupPage() {
       <AppHeader title="Unirse a un grupo" backHref="/" />
       <main className="mx-auto max-w-lg px-4 py-5">
         <div className="card mb-5 flex flex-col items-center gap-2 py-8 text-center">
-          <Hash size={28} className="text-emerald-400" />
+          <Hash size={28} className="text-orange-400" />
           <p className="text-sm text-slate-300">
             Ingresa el código del grupo para unirte (rol jugador).
           </p>

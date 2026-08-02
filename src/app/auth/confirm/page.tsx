@@ -48,14 +48,14 @@ function ConfirmView() {
     <div className="w-full max-w-xs text-center">
       {state === 'loading' && (
         <>
-          <Loader2 size={32} className="mx-auto mb-3 animate-spin text-emerald-400" />
+          <Loader2 size={32} className="mx-auto mb-3 animate-spin text-orange-400" />
           <p className="text-sm text-slate-400">Verificando tu enlace…</p>
         </>
       )}
       {state === 'ok' && (
         <>
-          <CheckCircle2 size={40} className="mx-auto mb-3 text-emerald-400" />
-          <p className="text-sm font-semibold text-emerald-300">¡Listo, entrando!</p>
+          <CheckCircle2 size={40} className="mx-auto mb-3 text-orange-400" />
+          <p className="text-sm font-semibold text-orange-300">¡Listo, entrando!</p>
         </>
       )}
       {state === 'error' && (

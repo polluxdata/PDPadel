@@ -176,7 +176,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
       <main className="mx-auto max-w-lg px-4 py-5">
         <section className="card mb-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
-            <KeyRound size={15} className="text-emerald-400" /> Enlace de invitación
+            <KeyRound size={15} className="text-orange-400" /> Enlace de invitación
           </h2>
           <p className="mb-3 text-xs text-slate-500">
             Genera un enlace y compártelo por WhatsApp. Quien lo abra, verifica su
@@ -188,7 +188,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
               className={
                 'flex-1 rounded-xl border py-2 text-sm font-semibold transition ' +
                 (pinRole === 'player'
-                  ? 'border-emerald-500 bg-emerald-500 text-slate-950'
+                  ? 'border-orange-500 bg-orange-500 text-slate-950'
                   : 'border-slate-700 bg-slate-800 text-slate-300')
               }
             >
@@ -211,11 +211,11 @@ export default function MembersClient({ groupId }: { groupId: string }) {
             Generar enlace
           </button>
           {invite && (
-            <div className="mt-3 rounded-xl border border-emerald-700 bg-emerald-950/30 p-3">
+            <div className="mt-3 rounded-xl border border-orange-700 bg-orange-950/30 p-3">
               <p className="mb-2 text-center text-xs text-slate-400">
                 Enlace para {pinRole === 'admin' ? 'administrador' : 'jugador'} (válido 7 días):
               </p>
-              <p className="break-all rounded-lg bg-slate-900 px-3 py-2 text-xs text-emerald-300">
+              <p className="break-all rounded-lg bg-slate-900 px-3 py-2 text-xs text-orange-300">
                 {invite}
               </p>
               <button
@@ -258,7 +258,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
                       <span className="font-medium">{displayName(r)}</span>
                       <span className="ml-2 text-xs text-slate-400">@{r.username}</span>
                     </span>
-                    <UserPlus size={16} className="text-emerald-400" />
+                    <UserPlus size={16} className="text-orange-400" />
                   </button>
                 </li>
               ))}
@@ -276,14 +276,14 @@ export default function MembersClient({ groupId }: { groupId: string }) {
               const isAdmin = isOwner || m.role === 'admin';
               return (
                 <div key={m.user.id} className="card flex items-center gap-3 !p-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-emerald-400">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-orange-400">
                     {displayName(m.user).slice(0, 1).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                       {displayName(m.user)}
                       {isAdmin && (
-                        <span className="ml-1.5 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                        <span className="ml-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
                           {isOwner ? 'ADMIN (dueño)' : 'ADMIN'}
                         </span>
                       )}

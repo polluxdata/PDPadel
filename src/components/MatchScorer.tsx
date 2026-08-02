@@ -95,7 +95,7 @@ export default function MatchScorer({
   return (
     <div className="flex flex-col gap-2">
       {showResult && (
-        <p className="flex items-center justify-center gap-2 rounded-xl border border-emerald-700 bg-emerald-950/30 py-2 text-sm font-bold text-emerald-300">
+        <p className="flex items-center justify-center gap-2 rounded-xl border border-orange-700 bg-orange-950/30 py-2 text-sm font-bold text-orange-300">
           <CheckCircle2 size={16} /> Ganó{' '}
           {winner === 1 ? teamLabel(teamA) : teamLabel(teamB)}{' '}
           <span className="font-mono">
@@ -114,7 +114,7 @@ export default function MatchScorer({
                 key={t}
                 className={
                   'rounded px-2 py-0.5 text-[10px] font-bold ' +
-                  (t === target ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-600')
+                  (t === target ? 'bg-orange-500 text-slate-950' : 'bg-slate-800 text-slate-600')
                 }
               >
                 {t}
@@ -172,7 +172,7 @@ function ScoreRow({
       <p className="w-11 text-center text-2xl font-black tabular-nums">{score}</p>
       <button
         onClick={() => onBump(1)}
-        className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 active:scale-90"
+        className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500 text-slate-950 active:scale-90"
         aria-label="Sumar"
       >
         <Plus size={18} />

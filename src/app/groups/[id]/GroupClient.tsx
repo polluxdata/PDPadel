@@ -180,15 +180,15 @@ export default function GroupClient({ groupId }: { groupId: string }) {
               </h2>
               <Link
                 href={`/groups/${group.id}/seasons/${season.id}`}
-                className="text-xs font-semibold text-emerald-400"
+                className="text-xs font-semibold text-orange-400"
               >
                 Ver temporada <ChevronRight size={12} className="inline" />
               </Link>
             </div>
 
-            <div className="card mb-3 flex items-center justify-between border-emerald-800 bg-emerald-950/20">
+            <div className="card mb-3 flex items-center justify-between border-orange-800 bg-orange-950/20">
               <div>
-                <p className="font-bold text-emerald-300">{season.name}</p>
+                <p className="font-bold text-orange-300">{season.name}</p>
                 <div className="text-xs text-slate-400">
                   {activeQuedadas.length === 0 ? (
                     'Sin quedadas activas'
@@ -202,7 +202,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
                           <Link
                             key={q.id}
                             href={`/groups/${group.id}/quedadas/${q.id}`}
-                            className="inline-flex w-fit items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300 hover:bg-emerald-500/25"
+                            className="inline-flex w-fit items-center gap-1 rounded-md bg-orange-500/15 px-2 py-0.5 font-semibold text-orange-300 hover:bg-orange-500/25"
                           >
                             {q.name || 'Quedada'} →
                           </Link>
@@ -214,7 +214,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
               </div>
               {myRank && (
                 <div className="text-center">
-                  <p className="text-3xl font-black text-emerald-400">#{myRank}</p>
+                  <p className="text-3xl font-black text-orange-400">#{myRank}</p>
                   <p className="text-[10px] uppercase tracking-wide text-slate-400">
                     tu puesto
                   </p>
@@ -273,14 +273,14 @@ export default function GroupClient({ groupId }: { groupId: string }) {
               const isAdmin = isOwner || m.role === 'admin';
               return (
                 <div key={m.user.id} className="card flex items-center gap-3 !p-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-emerald-400">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 font-bold text-orange-400">
                     {displayName(m.user).slice(0, 1).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                       {displayName(m.user)}
                       {isAdmin && (
-                        <span className="ml-1.5 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                        <span className="ml-1.5 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
                           ADMIN{isOwner ? ' (dueño)' : ''}
                         </span>
                       )}

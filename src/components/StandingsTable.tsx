@@ -39,7 +39,7 @@ export default function StandingsTable({
                 key={r.userId}
                 className={
                   mine
-                    ? 'bg-emerald-500/10'
+                    ? 'bg-orange-500/10'
                     : i % 2 === 0
                       ? 'bg-slate-900'
                       : 'bg-slate-900/50'
@@ -51,13 +51,13 @@ export default function StandingsTable({
                 <td className="max-w-32 truncate px-3 py-2.5 font-medium">
                   {r.name}
                   {mine && (
-                    <span className="ml-1 text-[10px] font-bold text-emerald-400">
+                    <span className="ml-1 text-[10px] font-bold text-orange-400">
                       (tú)
                     </span>
                   )}
                 </td>
                 <td className="px-2 py-2.5 text-center text-slate-300">{r.played}</td>
-                <td className="px-2 py-2.5 text-center font-semibold text-emerald-400">
+                <td className="px-2 py-2.5 text-center font-semibold text-orange-400">
                   {r.wins}
                 </td>
                 <td className="px-2 py-2.5 text-center text-rose-400">{r.losses}</td>

@@ -107,7 +107,7 @@ function NavLink({
       href={href}
       className={cn(
         'flex-1 py-3 text-center text-sm font-medium transition',
-        active ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-200'
+        active ? 'text-orange-400' : 'text-slate-400 hover:text-slate-200'
       )}
     >
       {label}

@@ -83,9 +83,9 @@ export default function RegisterPage() {
   if (sent) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-950 px-6 text-center">
-        <div className="rounded-xl border border-emerald-700 bg-emerald-950/30 p-6">
-          <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-400" />
-          <p className="text-lg font-extrabold text-emerald-300">Revisa tu correo</p>
+        <div className="rounded-xl border border-orange-700 bg-orange-950/30 p-6">
+          <CheckCircle2 size={32} className="mx-auto mb-2 text-orange-400" />
+          <p className="text-lg font-extrabold text-orange-300">Revisa tu correo</p>
           <p className="mt-2 max-w-xs text-sm text-slate-400">
             Te enviamos un enlace para confirmar tu registro en PDPadel. Vence en
             15 minutos.
@@ -128,7 +128,7 @@ export default function RegisterPage() {
                   (avail === 'checking' ? (
                     <Spinner size={18} className="animate-spin text-slate-500" />
                   ) : avail === 'available' ? (
-                    <Check size={18} className="text-emerald-400" />
+                    <Check size={18} className="text-orange-400" />
                   ) : (
                     <X size={18} className="text-rose-400" />
                   ))}
@@ -144,7 +144,7 @@ export default function RegisterPage() {
                     : avail === 'taken'
                       ? 'text-rose-400'
                       : avail === 'available'
-                        ? 'text-emerald-400'
+                        ? 'text-orange-400'
                         : 'text-slate-500')
               }
             >
@@ -206,7 +206,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-slate-400">
             ¿Ya tienes cuenta?{' '}
-            <Link href="/login" className="font-semibold text-emerald-400">
+            <Link href="/login" className="font-semibold text-orange-400">
               Inicia sesión
             </Link>
           </p>

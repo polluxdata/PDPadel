@@ -2,8 +2,16 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 export const SESSION_COOKIE = 'pdp_session';
 
+const STATIC_ASSET = /\.(png|jpg|jpeg|svg|webp|gif|ico|txt|xml|webmanifest)$/i;
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Assets estáticos (imágenes de la PWA, portada, etc.): servir sin sesión.
+  if (STATIC_ASSET.test(pathname)) {
+    return NextResponse.next();
+  }
+
   const hasSession = req.cookies.has(SESSION_COOKIE);
 
   if (
