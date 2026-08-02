@@ -1,15 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Flag, Loader2, Plus, Trophy, ChevronRight, Calendar } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import StandingsTable from '@/components/StandingsTable';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
 import { computeSeasonRanking } from '@/lib/points';
 import { formatDate } from '@/lib/utils';
-import { audit } from '@/lib/audit';
 import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, MatchWithUsers, Quedada, Season, User } from '@/lib/types';
 
@@ -20,11 +18,10 @@ export default function SeasonClient({
   groupId: string;
   seasonId: string;
 }) {
-  const supabase = useRef(createClient()).current;
   const { user } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
-  const [members, setMembers] = useState<User[]>([]);
+  const [members, setMembers] = useState<Array<{ user: User; role: string }>>([]);
   const [quedadas, setQuedadas] = useState<Quedada[]>([]);
   const [matches, setMatches] = useState<MatchWithUsers[]>([]);
   const [myRole, setMyRole] = useState<string | null>(null);
@@ -35,66 +32,36 @@ export default function SeasonClient({
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [{ data: g }, { data: s }, { data: gm }, { data: qs }, { data: mine }] =
-        await Promise.all([
-          supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
-          supabase.from('seasons').select('*').eq('id', seasonId).maybeSingle(),
-          supabase
-            .from('group_members')
-            .select('user:users(*)')
-            .eq('group_id', groupId),
-          supabase.from('quedadas').select('*').eq('season_id', seasonId).order('created_at'),
-          user
-            ? supabase
-                .from('group_members')
-                .select('role')
-                .eq('group_id', groupId)
-                .eq('user_id', user.id)
-                .maybeSingle()
-            : Promise.resolve({ data: null }),
-        ]);
-      if (g) setGroup(g as Group);
-      if (s) setSeason(s as Season);
-      if (mine) setMyRole((mine as { role?: string }).role ?? null);
-      if (gm) {
-        setMembers(
-          ((gm as unknown as Array<{ user: User | null }>))
-            .map((r) => r.user)
-            .filter(Boolean) as User[]
-        );
+      const res = await fetch(`/api/seasons/${seasonId}`);
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.error || 'No se pudo cargar la temporada.');
+        return;
       }
-      const q = (qs ?? []) as Quedada[];
-      setQuedadas(q);
-      const modeByQ = new Map(q.map((x) => [x.id, x.mode]));
-      if (q.length > 0) {
-        const { data: ms } = await supabase
-          .from('matches')
-          .select('*, p1:users!matches_player1_id_fkey(*), p2:users!matches_player2_id_fkey(*), p3:users!matches_player3_id_fkey(*), p4:users!matches_player4_id_fkey(*)')
-          .in('quedada_id', q.map((x) => x.id));
-        setMatches(
-          ((ms ?? []) as MatchWithUsers[]).map((m) => ({
-            ...m,
-            mode: modeByQ.get(m.quedada_id),
-          }))
-        );
-      } else {
-        setMatches([]);
-      }
+      setGroup(data.group as Group);
+      setSeason(data.season as Season);
+      setMembers((data.members ?? []) as Array<{ user: User; role: string }>);
+      setMyRole(data.myRole ?? null);
+      setQuedadas((data.quedadas ?? []) as Quedada[]);
+      setMatches((data.matches ?? []) as MatchWithUsers[]);
     } catch (err) {
       console.error('Error cargando temporada', err);
       setError('No se pudo cargar la temporada.');
     } finally {
       setLoading(false);
     }
-  }, [supabase, groupId, seasonId, user]);
+  }, [seasonId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const rows = computeSeasonRanking(members, matches);
+  const rows = computeSeasonRanking(
+    members.map((m) => m.user),
+    matches
+  );
   const winner = season?.winner_id
-    ? members.find((m) => m.id === season.winner_id)
+    ? members.find((m) => m.user.id === season.winner_id)
     : null;
 
   const isAdminHere = isGroupAdmin(user, group, myRole);
@@ -108,22 +75,9 @@ export default function SeasonClient({
     }
     if (!confirm('¿Cerrar la temporada? Se calcula el ganador y queda en solo lectura.')) return;
     setClosing(true);
-    const champion = rows[0]?.userId ?? null;
-    await supabase
-      .from('seasons')
-      .update({
-        status: 'closed',
-        end_date: new Date().toISOString().slice(0, 10),
-        winner_id: champion,
-      })
-      .eq('id', season.id);
-    await audit(supabase, {
-      userId: user.id,
-      action: 'close_season',
-      entity: 'season',
-      entityId: season.id,
-      details: { winner_id: champion },
-    });
+    const res = await fetch(`/api/seasons/${season.id}/close`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || 'No se pudo cerrar la temporada.');
     await load();
     setClosing(false);
   }
@@ -195,7 +149,7 @@ export default function SeasonClient({
             <p className="text-xs uppercase tracking-wide text-amber-300">Ganador de la temporada</p>
             <p className="mt-1 flex items-center justify-center gap-2 text-xl font-extrabold">
               <Trophy size={20} className="text-amber-400" />
-              {winner.first_name || winner.username}
+              {winner.user.first_name || winner.user.username}
             </p>
           </div>
         )}

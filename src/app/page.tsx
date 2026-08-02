@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Users, ChevronRight, Shield, Trophy, Plus, UserCircle2, CalendarClock } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession, isSuper } from '@/lib/session';
 import { displayName, formatDate } from '@/lib/utils';
 import type { Group, Season } from '@/lib/types';
@@ -17,7 +16,6 @@ interface GroupWithMeta extends Group {
 
 export default function HomePage() {
   const router = useRouter();
-  const supabase = createClient();
   const { user, loading: sessionLoading } = useSession();
   const [groups, setGroups] = useState<GroupWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,70 +31,18 @@ export default function HomePage() {
     (async () => {
       if (!user) return;
       try {
-        let groupRows: Group[] = [];
-
-        if (isSuper(user)) {
-          const { data } = await supabase.from('groups').select('*').order('name');
-          groupRows = (data ?? []) as Group[];
-        } else {
-          const [{ data: mine }, { data: owned }] = await Promise.all([
-            supabase
-              .from('group_members')
-              .select('group:groups(*)')
-              .eq('user_id', user.id),
-            supabase.from('groups').select('*').eq('admin_id', user.id),
-          ]);
-          const asMember = ((mine ?? []) as unknown as Array<{ group: Group | null }>)
-            .map((r) => r.group)
-            .filter(Boolean) as Group[];
-          groupRows = Array.from(
-            new Map(
-              [...asMember, ...((owned ?? []) as Group[])].map((g) => [g.id, g])
-            ).values()
-          );
+        const res = await fetch('/api/groups');
+        const data = await res.json();
+        if (data.ok) {
+          setGroups((data.groups ?? []) as GroupWithMeta[]);
         }
-
-        const meta: GroupWithMeta[] = groupRows.map((g) => ({
-          ...g,
-          myRole: g.admin_id === user.id ? 'admin' : 'member',
-        }));
-
-        // Roles por grupo: marcar ADMIN si la membresía lo es.
-        if (!isSuper(user) && groupRows.length > 0) {
-          const { data: myRoles } = await supabase
-            .from('group_members')
-            .select('group_id, role')
-            .eq('user_id', user.id);
-          const roleByGroup = new Map(
-            ((myRoles ?? []) as Array<{ group_id: string; role: string }>).map(
-              (r) => [r.group_id, r.role]
-            )
-          );
-          for (const g of meta) {
-            if (roleByGroup.get(g.id) === 'admin') g.myRole = 'admin';
-          }
-        }
-
-        if (groupRows.length > 0) {
-          const { data: seasons } = await supabase
-            .from('seasons')
-            .select('*')
-            .in('group_id', groupRows.map((g) => g.id))
-            .eq('status', 'active');
-          const activeSeasons = new Map(
-            ((seasons ?? []) as Season[]).map((s) => [s.group_id, s])
-          );
-          for (const g of meta) g.currentSeason = activeSeasons.get(g.id) ?? null;
-        }
-
-        setGroups(meta);
       } catch (err) {
         console.error('Error cargando inicio', err);
       } finally {
         setLoading(false);
       }
     })();
-  }, [supabase, user]);
+  }, [user]);
 
   if (sessionLoading || (loading && !user)) {
     return (

@@ -4,10 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Users } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
-import { generateMatches } from '@/lib/matchmaking';
-import { audit } from '@/lib/audit';
 import {
   DEFAULT_DURATION,
   DEFAULT_TARGET_SCORE,
@@ -18,13 +15,11 @@ import { displayName, cn } from '@/lib/utils';
 import type { Group, Season, User } from '@/lib/types';
 
 export default function NewQuedadaClient({ groupId }: { groupId: string }) {
-  
   const router = useRouter();
-  const supabase = createClient();
   const { user } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
-  const [members, setMembers] = useState<User[]>([]);
+  const [members, setMembers] = useState<Array<{ user: User; role: string }>>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [name, setName] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -39,29 +34,14 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
 
   useEffect(() => {
     (async () => {
-      const [{ data: g }, { data: s }, { data: gm }] = await Promise.all([
-        supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
-        supabase
-          .from('seasons')
-          .select('*')
-          .eq('group_id', groupId)
-          .eq('status', 'active')
-          .maybeSingle(),
-        supabase
-          .from('group_members')
-          .select('user:users(*)')
-          .eq('group_id', groupId),
-      ]);
-      if (g) setGroup(g as Group);
-      if (s) setSeason(s as Season);
-      if (gm) {
-        const ms = ((gm as unknown as Array<{ user: User | null }>))
-          .map((r) => r.user)
-          .filter(Boolean) as User[];
-        setMembers(ms);
-      }
+      const res = await fetch(`/api/groups/${groupId}`);
+      const data = await res.json();
+      if (!data.ok) return;
+      setGroup(data.group as Group);
+      setSeason((data.season ?? null) as Season | null);
+      setMembers((data.members ?? []) as Array<{ user: User; role: string }>);
     })();
-  }, [supabase, groupId]);
+  }, [groupId]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -82,61 +62,32 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
     }
     setSaving(true);
 
-    const { data: quedada, error: qErr } = await supabase
-      .from('quedadas')
-      .insert({
-        season_id: season.id,
-        name: name.trim() || null,
-        quedada_date: date,
-        duration_minutes: duration,
-        courts,
-        mode,
-        target_score: target,
-        created_by: user.id,
-      })
-      .select('id')
-      .single();
-
-    if (qErr || !quedada) {
+    try {
+      const res = await fetch(`/api/groups/${groupId}/quedadas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seasonId: season.id,
+          name,
+          date,
+          duration,
+          courts,
+          mode,
+          target,
+          playerIds: Array.from(selected),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.quedada) {
+        router.push(`/groups/${groupId}/quedadas/${data.quedada.id}`);
+      } else {
+        setError(data.error || 'No se pudo crear la quedada.');
+        setSaving(false);
+      }
+    } catch {
+      setError('Error al crear la quedada.');
       setSaving(false);
-      setError('No se pudo crear la quedada: ' + (qErr?.message ?? ''));
-      return;
     }
-
-    const playerIds = Array.from(selected);
-    await supabase.from('quedada_players').insert(
-      playerIds.map((user_id) => ({ quedada_id: quedada.id, user_id }))
-    );
-
-    const generated = generateMatches(playerIds, courts);
-    const { error: mErr } = await supabase.from('matches').insert(
-      generated.map((m) => ({
-        quedada_id: quedada.id,
-        round_number: m.round,
-        court_number: m.court,
-        player1_id: m.teamA[0],
-        player2_id: m.teamA[1],
-        player3_id: m.teamB[0],
-        player4_id: m.teamB[1],
-        status: 'pending',
-        created_by: user.id,
-      }))
-    );
-    if (mErr) {
-      setSaving(false);
-      setError('Se creó la quedada pero falló la generación de partidos: ' + mErr.message);
-      return;
-    }
-
-    await audit(supabase, {
-      userId: user.id,
-      action: 'create_quedada',
-      entity: 'quedada',
-      entityId: quedada.id,
-      details: { name: name.trim() || null, courts, mode, players: playerIds.length },
-    });
-
-    router.push(`/groups/${groupId}/quedadas/${quedada.id}`);
   }
 
   if (!group || !season) {
@@ -251,12 +202,12 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
             </div>
             <div className="flex flex-col gap-1.5">
               {members.map((m) => {
-                const on = selected.has(m.id);
+                const on = selected.has(m.user.id);
                 return (
                   <button
-                    key={m.id}
+                    key={m.user.id}
                     type="button"
-                    onClick={() => toggle(m.id)}
+                    onClick={() => toggle(m.user.id)}
                     className={cn(
                       'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition',
                       on
@@ -272,8 +223,8 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
                     >
                       ✓
                     </span>
-                    <span className="flex-1 font-medium">{displayName(m)}</span>
-                    <span className="text-xs text-slate-500">@{m.username}</span>
+                    <span className="flex-1 font-medium">{displayName(m.user)}</span>
+                    <span className="text-xs text-slate-500">@{m.user.username}</span>
                   </button>
                 );
               })}

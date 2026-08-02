@@ -4,13 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, CheckCircle2, Hash } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
-import { audit } from '@/lib/audit';
 
 export default function JoinGroupPage() {
   const router = useRouter();
-  const supabase = createClient();
   const { user, loading } = useSession();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -26,44 +23,22 @@ export default function JoinGroupPage() {
     if (!user || !code.trim()) return;
     setJoining(true);
 
-    const { data: group, error: gErr } = await supabase
-      .from('groups')
-      .select('id, name, status')
-      .ilike('code', code.trim())
-      .maybeSingle();
-
-    if (gErr || !group) {
+    try {
+      const res = await fetch('/api/groups/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (res.ok && data.groupId) {
+        router.push(`/groups/${data.groupId}`);
+        router.refresh();
+      } else {
+        setError(data.error || 'No se pudo unir al grupo.');
+      }
+    } finally {
       setJoining(false);
-      setError('No se encontró ningún grupo con ese código.');
-      return;
     }
-    if (group.status !== 'active') {
-      setJoining(false);
-      setError('Ese grupo está cerrado.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('group_members')
-      .upsert({ group_id: group.id, user_id: user.id, role: 'player' }, { onConflict: 'group_id,user_id' });
-
-    if (error) {
-      setJoining(false);
-      setError('No se pudo unir: ' + error.message);
-      return;
-    }
-
-    await audit(supabase, {
-      userId: user.id,
-      action: 'join_group',
-      entity: 'group',
-      entityId: group.id,
-      details: { code: code.trim() },
-    });
-
-    setJoining(false);
-    router.push(`/groups/${group.id}`);
-    router.refresh();
   }
 
   if (loading || !user) {

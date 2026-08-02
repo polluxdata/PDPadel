@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { magicToken, confirmUrl } from '@/lib/magic';
 import { sendEmail } from '@/lib/mail';
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const supabase0 = createClient();
+    const supabase0 = createServiceClient();
     const { data: taken } = await supabase0
       .from('users')
       .select('id')
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const supabase = createClient();
+  const supabase = createServiceClient();
 
   // Invitación: validar el token del enlace compartido y enlazarlo al email.
   let invite: { group_id: string | null; role: string | null } | null = null;

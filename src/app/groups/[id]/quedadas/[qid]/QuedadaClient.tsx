@@ -5,13 +5,10 @@ import Link from 'next/link';
 import { Flag, Loader2, Users } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import MatchCard from '@/components/MatchCard';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
-import { audit } from '@/lib/audit';
 import { displayName, formatDate } from '@/lib/utils';
 import { MODE_LABELS } from '@/lib/constants';
-import { isGroupAdmin } from '@/lib/groupRoles';
-import type { Group, MatchWithUsers, Quedada, User } from '@/lib/types';
+import type { MatchWithUsers, Quedada, User } from '@/lib/types';
 
 export default function QuedadaClient({
   groupId,
@@ -20,13 +17,11 @@ export default function QuedadaClient({
   groupId: string;
   quedadaId: string;
 }) {
-  const supabase = useRef(createClient()).current;
   const { user } = useSession();
-  const [group, setGroup] = useState<Group | null>(null);
   const [quedada, setQuedada] = useState<Quedada | null>(null);
   const [matches, setMatches] = useState<MatchWithUsers[]>([]);
   const [players, setPlayers] = useState<User[]>([]);
-  const [myRole, setMyRole] = useState<string | null>(null);
+  const [isAdminHere, setIsAdminHere] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
@@ -35,53 +30,27 @@ export default function QuedadaClient({
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [{ data: g }, { data: q }, { data: mt }, { data: qp }, { data: mine }] =
-        await Promise.all([
-          supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
-          supabase.from('quedadas').select('*').eq('id', quedadaId).maybeSingle(),
-          supabase
-            .from('matches')
-            .select('*, p1:users!matches_player1_id_fkey(*), p2:users!matches_player2_id_fkey(*), p3:users!matches_player3_id_fkey(*), p4:users!matches_player4_id_fkey(*)')
-            .eq('quedada_id', quedadaId)
-            .order('round_number')
-            .order('court_number'),
-          supabase
-            .from('quedada_players')
-            .select('user:users(*)')
-            .eq('quedada_id', quedadaId),
-          user
-            ? supabase
-                .from('group_members')
-                .select('role')
-                .eq('group_id', groupId)
-                .eq('user_id', user.id)
-                .maybeSingle()
-            : Promise.resolve({ data: null }),
-        ]);
-      if (g) setGroup(g as Group);
-      if (q) setQuedada(q as Quedada);
-      if (mine) setMyRole((mine as { role?: string }).role ?? null);
-      if (mt) setMatches(mt as MatchWithUsers[]);
-      if (qp) {
-        setPlayers(
-          ((qp as unknown as Array<{ user: User | null }>))
-            .map((r) => r.user)
-            .filter(Boolean) as User[]
-        );
+      const res = await fetch(`/api/quedadas/${quedadaId}`);
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.error || 'No se pudo cargar la quedada.');
+        return;
       }
+      setQuedada(data.quedada as Quedada);
+      setMatches((data.matches ?? []) as MatchWithUsers[]);
+      setPlayers((data.players ?? []) as User[]);
+      setIsAdminHere(Boolean(data.isAdmin));
     } catch (err) {
       console.error('Error cargando quedada', err);
       setError('No se pudo cargar la quedada.');
     } finally {
       setLoading(false);
     }
-  }, [supabase, groupId, quedadaId, user]);
+  }, [quedadaId]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  const isAdminHere = isGroupAdmin(user, group, myRole);
 
   async function finishQuedada() {
     if (!quedada || !user) return;
@@ -91,13 +60,9 @@ export default function QuedadaClient({
     }
     if (!confirm('¿Finalizar la quedada? Los puntos se suman al ranking de la temporada.')) return;
     setFinishing(true);
-    await supabase.from('quedadas').update({ status: 'completed' }).eq('id', quedada.id);
-    await audit(supabase, {
-      userId: user.id,
-      action: 'finish_quedada',
-      entity: 'quedada',
-      entityId: quedada.id,
-    });
+    const res = await fetch(`/api/quedadas/${quedada.id}/finish`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || 'No se pudo finalizar.');
     await load();
     setFinishing(false);
   }

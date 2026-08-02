@@ -20,7 +20,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 
 - **Rutas**: server components delgados (`page.tsx`) que pasan los ids por props a client components (`*Client.tsx`). **NO usar `useParams()` en client components**: causa bugs de navegación (params del route anterior o `undefined`). Los params se leen en el server wrapper y se pasan como props.
   - Segmentos: `groups/[id]` → prop `groupId`; `seasons/[seasonId]` → props `groupId` (ojo: el param del wrapper es `params.id`, no `params.groupId`) y `seasonId`; `quedadas/[qid]` → props `groupId` y `quedadaId`.
-- **Datos**: todo el fetch es cliente con `createClient()` (browser supabase). Patrón: `useCallback` + `load()` + `useEffect([load])`, con `try/catch/finally` y estado de `error` + botón Reintentar para nunca quedarse en "Cargando".
+- **Datos**: todo el fetch/mutación es por **API routes propias** (`/api/...`) que usan `SUPABASE_SERVICE_KEY` (service role, ignora RLS) y validan sesión + rol por grupo. El cliente **no toca Supabase** (la llave anon está bloqueada por RLS). Helpers: `requireUser()` y `getGroupRole()` en `lib/api/auth.ts`, cliente en `lib/supabase/service.ts`.
 - **Joins de partidos**: usar FK explícitas `p1:users!matches_player1_id_fkey(*)`, `p2:...player2_id...`, etc. (4 FK a la misma tabla; sin nombrarlas PostgREST puede resolver mal).
 - **Sesión**: `SessionProvider` en el root layout; `useSession()` expone `user`, `loading`, `refresh`. Helpers `isAdmin`, `isSuper`. Sesión por cookie httpOnly (`pdp_session`).
 - **Roles**: los roles son **por grupo** (`group_members.role` = `admin`|`player`). `users.role` solo distingue `super_admin` (control global); el resto son jugadores. `groups.admin_id` señala al dueño (admin irremovible). Ayudantes: `isGroupAdmin(user, group, membershipRole)` en `lib/groupRoles.ts`. Un usuario puede ser admin en un grupo y jugador en otro.
@@ -74,7 +74,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 ### Pendientes generales
 
 - **Seguridad**: el `sb_secret_`/service_role nunca debe ir al navegador. Si alguna llave de servicio se llegó a exponer, rotarla en Supabase.
-- **RLS abierta**: para producción multi-tenant conviene cerrar RLS por rol/sesión.
+- **RLS cerrada**: las políticas permisivas se eliminaron; la llave anon no accede a nada. El acceso pasa por las API routes con `SUPABASE_SERVICE_KEY`.
 - **Auditoría por app**: se inserta desde el cliente; si se requiere integridad fuerte, mover a triggers/función RPC de Supabase.
 - **Modo sets**: la UI ya no usa `max_sets`/`sets_details`; quedan en el esquema como legado.
 - **`AGENTS.md`**: mantener actualizado al cambiar rutas, lógica de ranking o seguridad.

@@ -1,13 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Copy, KeyRound, Search, Trash2, UserPlus } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
 import { displayName } from '@/lib/utils';
-import { audit } from '@/lib/audit';
 import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, User } from '@/lib/types';
 
@@ -18,7 +16,6 @@ export interface MemberRow {
 
 export default function MembersClient({ groupId }: { groupId: string }) {
   const router = useRouter();
-  const supabase = useRef(createClient()).current;
   const { user, loading } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -32,31 +29,13 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   const [changing, setChanging] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [{ data: g }, { data: gm }, { data: mine }] = await Promise.all([
-      supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
-      supabase
-        .from('group_members')
-        .select('role, user:users(*)')
-        .eq('group_id', groupId),
-      user
-        ? supabase
-            .from('group_members')
-            .select('role')
-            .eq('group_id', groupId)
-            .eq('user_id', user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
-    if (g) setGroup(g as Group);
-    if (mine) setMyRole((mine as { role?: string }).role ?? null);
-    if (gm) {
-      setMembers(
-        ((gm as unknown as Array<{ role: string; user: User | null }>))
-          .map((r) => (r.user ? { user: r.user, role: r.role } : null))
-          .filter(Boolean) as MemberRow[]
-      );
-    }
-  }, [supabase, groupId, user]);
+    const res = await fetch(`/api/groups/${groupId}`);
+    const data = await res.json();
+    if (!data.ok) return;
+    setGroup(data.group as Group);
+    setMembers((data.members ?? []) as MemberRow[]);
+    setMyRole(data.myRole ?? null);
+  }, [groupId]);
 
   useEffect(() => {
     load();
@@ -73,32 +52,24 @@ export default function MembersClient({ groupId }: { groupId: string }) {
     e.preventDefault();
     if (!query.trim()) return;
     setSearching(true);
-    const { data } = await supabase
-      .from('users')
-      .select('id, username, first_name, last_name, email, nickname, role, listed')
-      .ilike('username', `%${query.trim()}%`)
-      .eq('listed', true)
-      .order('username')
-      .limit(6);
-    setResults((data ?? []) as User[]);
+    const res = await fetch(`/api/users/search?q=${encodeURIComponent(query.trim())}`);
+    const data = await res.json();
+    setResults((data.users ?? []) as User[]);
     setSearching(false);
   }
 
   async function addMember(member: User) {
     if (!user) return;
-    const { error } = await supabase
-      .from('group_members')
-      .upsert({ group_id: groupId, user_id: member.id }, { onConflict: 'group_id,user_id' });
-    if (error) {
-      alert(error.message);
+    const res = await fetch(`/api/groups/${groupId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: member.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo agregar.');
       return;
     }
-    await audit(supabase, {
-      userId: user.id,
-      action: 'add_member',
-      entity: 'group_member',
-      details: { group_id: groupId, user_id: member.id },
-    });
     setResults([]);
     setQuery('');
     await load();
@@ -107,17 +78,9 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   async function removeMember(member: User) {
     if (!user) return;
     if (!confirm(`¿Quitar a ${displayName(member)} del grupo?`)) return;
-    await supabase
-      .from('group_members')
-      .delete()
-      .eq('group_id', groupId)
-      .eq('user_id', member.id);
-    await audit(supabase, {
-      userId: user.id,
-      action: 'remove_member',
-      entity: 'group_member',
-      details: { group_id: groupId, user_id: member.id },
-    });
+    const res = await fetch(`/api/groups/${groupId}/members/${member.id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || 'No se pudo quitar.');
     await load();
   }
 
@@ -128,17 +91,13 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   async function changeRole(member: User, role: 'admin' | 'player') {
     if (!user || !canManageRoles) return;
     setChanging(member.id);
-    await supabase
-      .from('group_members')
-      .update({ role })
-      .eq('group_id', groupId)
-      .eq('user_id', member.id);
-    await audit(supabase, {
-      userId: user.id,
-      action: 'change_role',
-      entity: 'group_member',
-      details: { group_id: groupId, user_id: member.id, role },
+    const res = await fetch(`/api/groups/${groupId}/members/${member.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
     });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || 'No se pudo cambiar el rol.');
     setChanging(null);
     await load();
   }

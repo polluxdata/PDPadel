@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { SESSION_COOKIE } from '@/middleware';
 import type { PublicUser } from '@/lib/types';
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Ingresa usuario y PIN.' }, { status: 400 });
   }
 
-  const supabase = createClient();
+  const supabase = createServiceClient();
   const { data: user, error } = await supabase
     .from('users')
     .select('*')

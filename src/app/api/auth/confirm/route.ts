@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { SESSION_COOKIE } from '@/middleware';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 export async function POST(req: NextRequest) {
   const { token } = (await req.json().catch(() => ({}))) as { token?: string };
-  const supabase = createClient();
+  const supabase = createServiceClient();
 
   if (!token) {
     return NextResponse.json({ ok: false, error: 'Falta el token.' }, { status: 400 });

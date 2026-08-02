@@ -1,63 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
-import { audit } from '@/lib/audit';
 
 export default function NewSeasonClient({ groupId }: { groupId: string }) {
-  
   const router = useRouter();
-  const supabase = createClient();
   const { user, loading } = useSession();
   const [name, setName] = useState('Temporada');
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from('seasons')
-        .select('name')
-        .eq('group_id', groupId)
-        .order('created_at')
-        .limit(1);
-      if (data && data.length > 0) {
-        setName(`${data[0].name} (nueva)`);
-      }
-    })();
-  }, [supabase, groupId]);
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !name.trim()) return;
     setSaving(true);
-    const { data, error } = await supabase
-      .from('seasons')
-      .insert({
-        group_id: groupId,
-        name: name.trim(),
-        start_date: startDate,
-        created_by: user.id,
-      })
-      .select('id')
-      .single();
-    if (error || !data) {
-      setSaving(false);
-      alert('No se pudo crear la temporada: ' + (error?.message ?? ''));
-      return;
-    }
-    await audit(supabase, {
-      userId: user.id,
-      action: 'create_season',
-      entity: 'season',
-      entityId: data.id,
-      details: { name: name.trim() },
+    const res = await fetch(`/api/groups/${groupId}/seasons`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, startDate }),
     });
-    router.push(`/groups/${groupId}`);
+    const data = await res.json();
+    setSaving(false);
+    if (res.ok) {
+      router.push(`/groups/${groupId}`);
+    } else {
+      alert(data.error || 'No se pudo crear la temporada.');
+    }
   }
 
   if (loading || !user) {

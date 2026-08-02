@@ -3,14 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Mail, CheckCircle2, Check, X, Loader as Spinner } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 type Availability = 'idle' | 'checking' | 'available' | 'taken';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 export default function RegisterPage() {
-  const supabase = useRef(createClient()).current;
   const [form, setForm] = useState({
     username: '',
     email: '',
@@ -37,17 +35,14 @@ export default function RegisterPage() {
     setAvail('checking');
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', value)
-        .maybeSingle();
-      setAvail(data ? 'taken' : 'available');
+      const res = await fetch(`/api/users/check?username=${encodeURIComponent(value)}`);
+      const data = await res.json();
+      setAvail(data.available ? 'available' : 'taken');
     }, 350);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [form.username, supabase]);
+  }, [form.username]);
 
   const usernameValid = USERNAME_RE.test(form.username.trim().toLowerCase());
   const canSubmit =

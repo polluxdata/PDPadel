@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { SESSION_COOKIE } from '@/middleware';
 
 export async function GET() {
-  const supabase = createClient();
+  const supabase = createServiceClient();
   const cookieStore = await import('next/headers').then((m) => m.cookies());
   const uid = cookieStore.get(SESSION_COOKIE)?.value;
 

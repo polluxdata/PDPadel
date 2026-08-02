@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 // Crea el usuario 0 (super admin) si no existe. Idempotente.
 export async function POST() {
-  const supabase = createClient();
+  const supabase = createServiceClient();
 
   const { data, error } = await supabase
     .from('users')

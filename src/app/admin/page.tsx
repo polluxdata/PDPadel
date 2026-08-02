@@ -7,16 +7,13 @@ import {
   Shield, Users as UsersIcon, Search, ChevronLeft, ChevronRight, Trash2, LogIn,
 } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession, isSuper } from '@/lib/session';
 import { ROLE_LABELS } from '@/lib/constants';
 import { displayName, formatDate } from '@/lib/utils';
-import { audit } from '@/lib/audit';
 import type { Group, User } from '@/lib/types';
 
 export default function AdminPanel() {
   const router = useRouter();
-  const supabase = createClient();
   const { user, loading } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
 
@@ -27,21 +24,21 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!user || !isSuper(user)) return;
     (async () => {
-      const { data: g } = await supabase.from('groups').select('*').order('name');
-      if (g) setGroups(g as Group[]);
+      const res = await fetch('/api/groups');
+      const data = await res.json();
+      if (data.ok) setGroups((data.groups ?? []) as Group[]);
     })();
-  }, [supabase, user]);
+  }, [user]);
 
   async function closeGroup(g: Group) {
     if (!user) return;
     if (!confirm(`¿Cerrar el grupo "${g.name}"? Quedará en solo lectura.`)) return;
-    await supabase.from('groups').update({ status: 'closed' }).eq('id', g.id);
-    await audit(supabase, {
-      userId: user.id,
-      action: 'close_group',
-      entity: 'group',
-      entityId: g.id,
-    });
+    const res = await fetch(`/api/groups/${g.id}`, { method: 'PATCH' });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo cerrar el grupo.');
+      return;
+    }
     setGroups((prev) => prev.map((x) => (x.id === g.id ? { ...x, status: 'closed' } : x)));
   }
 
@@ -108,7 +105,6 @@ interface Membership {
 }
 
 function UsersAdmin() {
-  const supabase = useRef(createClient()).current;
   const { user: me } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [memberships, setMemberships] = useState<Record<string, Membership>>({});
@@ -130,89 +126,27 @@ function UsersAdmin() {
       return;
     }
     if (!confirm('Esta acción no se puede deshacer. ¿Borrar al jugador?')) return;
-    await supabase.from('users').delete().eq('id', u.id);
-    await audit(supabase, {
-      userId: me?.id ?? '',
-      action: 'delete_user',
-      entity: 'user',
-      entityId: u.id,
-      details: { username: u.username },
-    });
+    const res = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || 'No se pudo borrar.');
     await load();
   }
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      let idFilter: string[] | null = null;
-      if (filter === 'group_admin' || filter === 'no_groups') {
-        const { data } = await supabase
-          .from('group_members')
-          .select('user_id')
-          .eq('role', 'admin');
-        const ids = new Set((data ?? []).map((r) => (r as unknown as { user_id: string }).user_id));
-        if (filter === 'group_admin') {
-          idFilter = Array.from(ids);
-        } else {
-          // no_groups: todos los miembros (para excluirlos)
-          const all = await supabase.from('group_members').select('user_id');
-          idFilter = Array.from(
-            new Set((all.data ?? []).map((r) => (r as unknown as { user_id: string }).user_id))
-          );
-        }
-        if (filter === 'group_admin' && idFilter.length === 0) {
-          setUsers([]);
-          setMemberships({});
-          setTotal(0);
-          return;
-        }
-      }
-
-      let builder = supabase
-        .from('users')
-        .select('*', { count: 'exact' });
-
-      if (query.trim()) {
-        const q = query.trim();
-        builder = builder.or(`username.ilike.%${q}%,email.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
-      }
-      if (filter === 'super') {
-        builder = builder.eq('role', 'super_admin');
-      } else if (filter === 'group_admin' && idFilter) {
-        builder = builder.in('id', idFilter);
-      } else if (filter === 'no_groups' && idFilter) {
-        builder = builder.not('id', 'in', `(${idFilter.join(',')})`);
-      }
-
-      const from = (page - 1) * PAGE_SIZE;
-      const { data, count } = await builder
-        .order('created_at', { ascending: false })
-        .range(from, from + PAGE_SIZE - 1);
-
-      const rows = (data ?? []) as User[];
-      setUsers(rows);
-      setTotal(count ?? 0);
-
-      if (rows.length > 0) {
-        const { data: ms } = await supabase
-          .from('group_members')
-          .select('user_id, role, group:groups(name)')
-          .in('user_id', rows.map((u) => u.id));
-        const map: Record<string, Membership> = {};
-        for (const r of (ms ?? []) as unknown as Array<{ user_id: string; role: string; group: { name: string } | null }>) {
-          if (!r.group) continue;
-          if (!map[r.user_id]) map[r.user_id] = { adminIn: [], playerIn: [] };
-          if (r.role === 'admin') map[r.user_id].adminIn.push(r.group.name);
-          else map[r.user_id].playerIn.push(r.group.name);
-        }
-        setMemberships(map);
-      } else {
-        setMemberships({});
-      }
+      const params = new URLSearchParams({ page: String(page), filter });
+      if (query.trim()) params.set('q', query.trim());
+      const res = await fetch(`/api/admin/users?${params}`);
+      const data = await res.json();
+      if (!data.ok) return;
+      setUsers((data.users ?? []) as User[]);
+      setMemberships((data.memberships ?? {}) as Record<string, Membership>);
+      setTotal(data.total ?? 0);
     } finally {
       setLoading(false);
     }
-  }, [supabase, page, query, filter]);
+  }, [page, query, filter]);
 
   useEffect(() => {
     load();

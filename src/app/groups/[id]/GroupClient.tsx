@@ -1,22 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Trophy, Users, Plus, CalendarPlus, UserCog, Flag, ChevronRight,
 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import StandingsTable from '@/components/StandingsTable';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
 import { computeSeasonRanking } from '@/lib/points';
 import { displayName } from '@/lib/utils';
-import { audit } from '@/lib/audit';
 import { isGroupAdmin } from '@/lib/groupRoles';
 import type { Group, MatchWithUsers, Quedada, Season, User } from '@/lib/types';
 
 export default function GroupClient({ groupId }: { groupId: string }) {
-  const supabase = useRef(createClient()).current;
   const { user } = useSession();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Array<{ user: User; role: string }>>([]);
@@ -30,72 +27,25 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [{ data: g }, { data: gm }, { data: s }, { data: mine }] = await Promise.all([
-        supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
-        supabase
-          .from('group_members')
-          .select('role, user:users(*)')
-          .eq('group_id', groupId),
-        supabase
-          .from('seasons')
-          .select('*')
-          .eq('group_id', groupId)
-          .eq('status', 'active')
-          .maybeSingle(),
-        user
-          ? supabase
-              .from('group_members')
-              .select('role')
-              .eq('group_id', groupId)
-              .eq('user_id', user.id)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-
-      if (g) setGroup(g as Group);
-      if (mine) setMyRole((mine as { role?: string }).role ?? null);
-      if (gm) {
-        setMembers(
-          ((gm as unknown as Array<{ role: string; user: User | null }>))
-            .map((r) => (r.user ? { user: r.user, role: r.role } : null))
-            .filter(Boolean) as Array<{ user: User; role: string }>
-        );
+      const res = await fetch(`/api/groups/${groupId}`);
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.error || 'No se pudo cargar el grupo.');
+        return;
       }
-      if (s) {
-        setSeason(s as Season);
-        const { data: qs } = await supabase
-          .from('quedadas')
-          .select('*')
-          .eq('season_id', (s as Season).id);
-        const q = (qs ?? []) as Quedada[];
-        setQuedadas(q);
-        const modeByQ = new Map(q.map((x) => [x.id, x.mode]));
-        if (q.length > 0) {
-          const { data: ms } = await supabase
-            .from('matches')
-            .select('*, p1:users!matches_player1_id_fkey(*), p2:users!matches_player2_id_fkey(*), p3:users!matches_player3_id_fkey(*), p4:users!matches_player4_id_fkey(*)')
-            .in('quedada_id', q.map((x) => x.id));
-          setMatches(
-            ((ms ?? []) as MatchWithUsers[]).map((m) => ({
-              ...m,
-              mode: modeByQ.get(m.quedada_id),
-            }))
-          );
-        } else {
-          setMatches([]);
-        }
-      } else {
-        setSeason(null);
-        setMatches([]);
-        setQuedadas([]);
-      }
+      setGroup(data.group as Group);
+      setMembers((data.members ?? []) as Array<{ user: User; role: string }>);
+      setMyRole(data.myRole ?? null);
+      setSeason((data.season ?? null) as Season | null);
+      setQuedadas((data.quedadas ?? []) as Quedada[]);
+      setMatches((data.matches ?? []) as MatchWithUsers[]);
     } catch (err) {
       console.error('Error cargando grupo', err);
       setError('No se pudo cargar el grupo.');
     } finally {
       setLoading(false);
     }
-  }, [supabase, groupId, user]);
+  }, [groupId]);
 
   useEffect(() => {
     load();
@@ -112,9 +62,13 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   async function closeGroup() {
     if (!group || !user) return;
     if (!confirm('¿Cerrar el grupo? Quedará en solo lectura.')) return;
-    await supabase.from('groups').update({ status: 'closed' }).eq('id', group.id);
-    await audit(supabase, { userId: user.id, action: 'close_group', entity: 'group', entityId: group.id });
-    setGroup({ ...group, status: 'closed' });
+    const res = await fetch(`/api/groups/${group.id}`, { method: 'PATCH' });
+    if (res.ok) {
+      setGroup({ ...group, status: 'closed' });
+    } else {
+      const data = await res.json();
+      alert(data.error || 'No se pudo cerrar el grupo.');
+    }
   }
 
   if (error) {

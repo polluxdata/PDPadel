@@ -1,10 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, Minus, Plus } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { useSession } from '@/lib/session';
-import { audit } from '@/lib/audit';
 import { SCORE_TARGETS } from '@/lib/constants';
 import { displayName } from '@/lib/utils';
 import type { MatchWithUsers, User } from '@/lib/types';
@@ -24,18 +21,9 @@ export default function MatchScorer({
   editing?: boolean;
   onSaved: () => void;
 }) {
-  const supabase = useRef(createClient()).current;
-  const { user } = useSession();
   const [score1, setScore1] = useState(match.score_team1);
   const [score2, setScore2] = useState(match.score_team2);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (match.status === 'pending') {
-      supabase.from('matches').update({ status: 'in_progress' }).eq('id', match.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Al recargar (tras guardar/editar), sincronizar el marcador con lo guardado.
   useEffect(() => {
@@ -64,28 +52,19 @@ export default function MatchScorer({
   }
 
   async function save() {
-    if (!winner || !user) return;
+    if (!winner) return;
     setSaving(true);
-    const patch = {
-      score_team1: score1,
-      score_team2: score2,
-      sets_details: null,
-      winner_team: winner,
-      status: 'completed',
-    };
-    const { error } = await supabase.from('matches').update(patch).eq('id', match.id);
-    if (error) {
+    const res = await fetch(`/api/matches/${match.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ score1, score2, winner }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
       setSaving(false);
-      alert('Error al guardar: ' + error.message);
+      alert(data.error || 'Error al guardar.');
       return;
     }
-    await audit(supabase, {
-      userId: user.id,
-      action: 'complete_match',
-      entity: 'match',
-      entityId: match.id,
-      details: { ...patch },
-    });
     setSaving(false);
     onSaved();
   }

@@ -4,15 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Save } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
-import { audit } from '@/lib/audit';
 import { ROLE_LABELS } from '@/lib/constants';
 import { displayName, formatDate } from '@/lib/utils';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const supabase = createClient();
   const { user, refresh } = useSession();
   const [form, setForm] = useState({
     firstName: user?.first_name ?? '',
@@ -45,25 +42,23 @@ export default function ProfilePage() {
     if (!user) return;
     setMsg('');
     setSaving(true);
-    const patch: Record<string, unknown> = {
-      first_name: form.firstName,
-      last_name: form.lastName,
-      email: form.email || null,
-      nickname: form.nickname || null,
-      listed: form.listed,
-    };
-    const { error } = await supabase.from('users').update(patch).eq('id', user.id);
-    if (error) {
-      setMsg('Error al guardar: ' + error.message);
+    const res = await fetch('/api/users/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        nickname: form.nickname,
+        listed: form.listed,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setMsg('Error al guardar: ' + (data.error || 'error'));
       setSaving(false);
       return;
     }
-    await audit(supabase, {
-      userId: user.id,
-      action: 'update_profile',
-      entity: 'user',
-      entityId: user.id,
-    });
     setSaving(false);
     setMsg('Guardado correctamente.');
     await refresh();

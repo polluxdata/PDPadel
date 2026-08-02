@@ -4,14 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
-import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/lib/session';
-import { audit } from '@/lib/audit';
-import { randomGroupCode } from '@/lib/groupRoles';
 
 export default function NewGroupPage() {
   const router = useRouter();
-  const supabase = createClient();
   const { user, loading } = useSession();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -27,71 +23,23 @@ export default function NewGroupPage() {
     e.preventDefault();
     if (!user || !name.trim()) return;
     setSaving(true);
-
-    // Generar un código único para el grupo (reintenta si colisiona).
-    let code = '';
-    for (let i = 0; i < 5; i++) {
-      code = randomGroupCode();
-      const { data: exists } = await supabase
-        .from('groups')
-        .select('id')
-        .eq('code', code)
-        .limit(1);
-      if (!exists || exists.length === 0) break;
-      code = '';
-    }
-    if (!code) {
-      setSaving(false);
-      alert('No se pudo generar un código único. Inténtalo de nuevo.');
-      return;
-    }
-
-    const { data: group, error } = await supabase
-      .from('groups')
-      .insert({
-        name: name.trim(),
-        code,
-        description: description.trim() || null,
-        admin_id: user.id,
-        created_by: user.id,
-      })
-      .select('id, name, code')
-      .single();
-
-    if (error || !group) {
-      setSaving(false);
-      alert('No se pudo crear el grupo: ' + (error?.message ?? 'error'));
-      return;
-    }
-
-    // El creador queda como administrador del grupo.
-    await supabase
-      .from('group_members')
-      .upsert(
-        { group_id: group.id, user_id: user.id, role: 'admin' },
-        { onConflict: 'group_id,user_id' }
-      );
-    const { data: season } = await supabase
-      .from('seasons')
-      .insert({ group_id: group.id, name: 'Temporada 1', start_date: new Date().toISOString().slice(0, 10), created_by: user.id })
-      .select('id')
-      .single();
-    await audit(supabase, {
-      userId: user.id,
-      action: 'create_group',
-      entity: 'group',
-      entityId: group.id,
-      details: { name: group.name, code: group.code },
-    });
-    if (season) {
-      await audit(supabase, {
-        userId: user.id,
-        action: 'create_season',
-        entity: 'season',
-        entityId: season.id,
+    try {
+      const res = await fetch('/api/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
       });
+      const data = await res.json();
+      if (res.ok && data.group) {
+        router.push(`/groups/${data.group.id}`);
+      } else {
+        alert(data.error || 'No se pudo crear el grupo.');
+        setSaving(false);
+      }
+    } catch {
+      alert('Error al crear el grupo.');
+      setSaving(false);
     }
-    router.push(`/groups/${group.id}`);
   }
 
   if (loading || !user) {

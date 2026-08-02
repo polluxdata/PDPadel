@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { SESSION_COOKIE } from '@/middleware';
 import { magicToken, inviteUrl } from '@/lib/magic';
 import type { UserRole } from '@/lib/types';
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Selecciona un grupo.' }, { status: 400 });
   }
 
-  const supabase = createClient();
+  const supabase = createServiceClient();
   const uid = req.cookies.get(SESSION_COOKIE)?.value;
   if (!uid) return NextResponse.json({ ok: false }, { status: 401 });
 
