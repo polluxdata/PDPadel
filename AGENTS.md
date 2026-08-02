@@ -4,7 +4,7 @@ Guía de contexto para agentes de IA que trabajen en este repositorio.
 
 ## Proyecto
 
-PWA de Pádel Americano (Next.js 14 App Router + TypeScript + Tailwind + Supabase + next-pwa). Mobile-first. Acceso con PIN.
+PWA de Pádel Americano (Next.js 14 App Router + TypeScript + Tailwind + Supabase + next-pwa). Mobile-first. Acceso por **magic link** (email); PIN solo como respaldo del superadmin. En producción: https://ppadel.polluxdata.com (Vercel).
 
 ## Comandos útiles
 
@@ -33,7 +33,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Puntos de ranking**: modo puntos = 2 pts por victoria; modo sets = 1 pt (`SETS_WIN_POINTS`). El marcador (pointsFor/Against) siempre suma a la diferencia de desempate; `sets_details` es legado opcional.
 - **Partidos**: no se pueden "saltar" (no hay botón). La quedada puede finalizar antes con "Finalizar quedada"; los pendientes no cuentan.
 - **Edición**: el admin puede editar resultados ya registrados (el marcador inline con "Guardar cambios"). `MatchScorer` sincroniza su estado con la prop `match` tras recargar.
-- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
+- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `remove_member`, `change_role`, `join_group`, `delete_user`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
 
 ## Matchmaking
 
@@ -75,6 +75,8 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 
 - **Seguridad**: el `sb_secret_`/service_role nunca debe ir al navegador. Si alguna llave de servicio se llegó a exponer, rotarla en Supabase.
 - **RLS cerrada**: las políticas permisivas se eliminaron; la llave anon no accede a nada. El acceso pasa por las API routes con `SUPABASE_SERVICE_KEY`.
+- **Sesiones y rate limit**: **IMPLEMENTADO** — sesiones revocables (hash en `sessions`, expiración 30 días) y `checkRateLimit()` (tabla `rate_limits`).
+- **PWA**: `handle_links: "auto"` + `scope` en `public/manifest.webmanifest` (Android/Chrome abre la app instalada con enlaces del dominio; iOS no soporta link-capture en PWA).
 - **Auditoría por app**: se inserta desde el cliente; si se requiere integridad fuerte, mover a triggers/función RPC de Supabase.
 - **Modo sets**: la UI ya no usa `max_sets`/`sets_details`; quedan en el esquema como legado.
 - **`AGENTS.md`**: mantener actualizado al cambiar rutas, lógica de ranking o seguridad.

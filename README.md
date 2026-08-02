@@ -52,6 +52,7 @@ npm install
 cp .env.local.example .env.local
 #    Completa:
 #    - NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+#    - SUPABASE_SERVICE_KEY (service_role; SOLO servidor, nunca NEXT_PUBLIC_)
 #    - SUPER_ADMIN_PIN, SUPER_ADMIN_EMAIL
 #    - APP_URL (http://localhost:3000 en local)
 #    - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM (SMTP de OCI Email Delivery)
@@ -62,7 +63,7 @@ Primer acceso: pide el magic link para `SUPER_ADMIN_EMAIL`, o entra con PIN `sup
 
 ## Deploy (Vercel)
 
-La app está desplegada en **https://ppadel.polluxdata.com**. Importa el repo en Vercel y añade las mismas variables de entorno (Settings → Environment Variables), con `APP_URL` apuntando al dominio de producción. La PWA es instalable desde el navegador del teléfono.
+La app está desplegada en **https://ppadel.polluxdata.com**. Importa el repo en Vercel y añade las mismas variables de entorno (Settings → Environment Variables), con `APP_URL` apuntando al dominio de producción. La PWA es instalable desde el navegador del teléfono; en Android/Chrome los enlaces dentro del dominio abren la app instalada (`handle_links: auto`).
 
 ## Estructura
 
@@ -76,7 +77,9 @@ src/
       members/                   # administrar jugadores + enlaces de invitación
       seasons/new/  seasons/[seasonId]/   # crear y ver temporada (clasificación, cerrar)
       quedadas/new/  quedadas/[qid]/      # crear quedada y marcador por rondas
-    api/auth/                    # magic, invite, accept-invite, confirm, login, session, logout, bootstrap
+    api/                         # API routes propias (sesión + roles; service key)
+      auth/                      # magic, invite, accept-invite, confirm, login, session, logout, bootstrap
+      groups/ seasons/ quedadas/ matches/ users/ admin/
   components/                    # AppHeader, MatchCard, MatchScorer, StandingsTable
   lib/
     matchmaking.ts               # round-robin (parejas + rivales)
@@ -85,13 +88,29 @@ src/
     groupRoles.ts                # isGroupAdmin + códigos de grupo
     magic.ts / mail.ts           # tokens de enlace y envío SMTP (nodemailer)
     audit.ts                     # trazabilidad
-    supabase/                    # clientes (browser y server)
+    api/auth.ts                  # sesiones (createSession, requireUser, revoke)
+    api/rateLimit.ts             # rate limiting (tabla rate_limits)
+    supabase/                    # service.ts (service role, solo servidor)
 supabase/schema.sql              # esquema SQL + RLS
 ```
 
+## API (resumen)
+
+- `/api/auth/*`: magic link, confirmación, invitación, sesión, login/logout, bootstrap.
+- `/api/groups` y `/api/groups/[id]`: listar/crear/cerrar grupos y detalle.
+- `/api/groups/join`: unirse con código.
+- `/api/groups/[id]/members[/[userId]]`: agregar, cambiar rol, quitar.
+- `/api/groups/[id]/seasons`, `/api/seasons/[id]`: crear/cerrar temporadas y detalle con ranking.
+- `/api/groups/[id]/quedadas`, `/api/quedadas/[id]`: crear/finalizar quedadas.
+- `/api/matches/[id]`: registrar/editar marcador.
+- `/api/users/me`, `/api/users/search`, `/api/users/check`, `/api/admin/users`: perfil, búsqueda, disponibilidad y panel de admin.
+
 ## Seguridad
 
+- **RLS cerrada**: las políticas permisivas se eliminaron; la llave `anon` (publishable) no puede leer ni escribir nada. Todo el acceso pasa por **API routes propias** que usan la llave `service_role` (solo servidor) y validan sesión + rol por grupo.
+- **Sesiones revocables**: la cookie guarda un token aleatorio; en Supabase (tabla `sessions`) solo su hash, con expiración (30 días) y revocable al cerrar sesión.
+- **Rate limit**: límites en el envío de magic links (por email/IP) e invitaciones (tabla `rate_limits`).
 - Las credenciales reales van en variables de entorno (`.env.local`, gitignoreado); solo se versiona `.env.local.example` como plantilla.
-- Claves de servidor (`service_role`/`sb_secret_`) y credenciales SMTP nunca van al navegador ni se versionan; se usan solo en endpoints del servidor vía variables de entorno.
+- Claves de servidor (`service_role`/`sb_secret_`), Supabase y SMTP nunca van al navegador ni se versionan; se usan solo en endpoints del servidor vía variables de entorno.
 - El esquema y las políticas RLS de Supabase están en `supabase/schema.sql`.
 
