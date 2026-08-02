@@ -197,6 +197,37 @@ end $$;
 -- (POST /api/auth/bootstrap) usando la variable SUPER_ADMIN_PIN.
 
 -- ============================================================
+-- SESSIONS (revocables, con expiración)
+-- La cookie guarda el token (aleatorio); en BD solo su hash.
+-- ============================================================
+create table if not exists public.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  revoked boolean not null default false
+);
+create index if not exists sessions_user_idx on public.sessions (user_id);
+
+-- ============================================================
+-- RATE LIMITS (control de abuso: magic links, invitaciones…)
+-- ============================================================
+create table if not exists public.rate_limits (
+  id uuid primary key default gen_random_uuid(),
+  key text not null,
+  window_start timestamptz not null,
+  count int not null default 0,
+  created_at timestamptz not null default now(),
+  unique (key, window_start)
+);
+
+-- Acceso solo vía service key (sin políticas permisivas).
+alter table public.sessions enable row level security;
+alter table public.rate_limits enable row level security;
+
+-- ============================================================
 -- TRIGGER: si se borra el dueño de un grupo, el grupo pasa al
 -- super admin (evita grupos huérfanos).
 -- ============================================================

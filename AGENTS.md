@@ -20,9 +20,9 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 
 - **Rutas**: server components delgados (`page.tsx`) que pasan los ids por props a client components (`*Client.tsx`). **NO usar `useParams()` en client components**: causa bugs de navegación (params del route anterior o `undefined`). Los params se leen en el server wrapper y se pasan como props.
   - Segmentos: `groups/[id]` → prop `groupId`; `seasons/[seasonId]` → props `groupId` (ojo: el param del wrapper es `params.id`, no `params.groupId`) y `seasonId`; `quedadas/[qid]` → props `groupId` y `quedadaId`.
-- **Datos**: todo el fetch/mutación es por **API routes propias** (`/api/...`) que usan `SUPABASE_SERVICE_KEY` (service role, ignora RLS) y validan sesión + rol por grupo. El cliente **no toca Supabase** (la llave anon está bloqueada por RLS). Helpers: `requireUser()` y `getGroupRole()` en `lib/api/auth.ts`, cliente en `lib/supabase/service.ts`.
+- **Datos**: todo el fetch/mutación es por **API routes propias** (`/api/...`) que usan `SUPABASE_SERVICE_KEY` (service role, ignora RLS) y validan sesión + rol por grupo. El cliente **no toca Supabase** (la llave anon está bloqueada por RLS). Helpers: `requireUser()` y `getGroupRole()` en `lib/api/auth.ts`, cliente en `lib/supabase/service.ts`. **Rate limit**: `checkRateLimit()` en `lib/api/rateLimit.ts` (tabla `rate_limits`) aplicado en magic links (por email/IP) e invitaciones.
 - **Joins de partidos**: usar FK explícitas `p1:users!matches_player1_id_fkey(*)`, `p2:...player2_id...`, etc. (4 FK a la misma tabla; sin nombrarlas PostgREST puede resolver mal).
-- **Sesión**: `SessionProvider` en el root layout; `useSession()` expone `user`, `loading`, `refresh`. Helpers `isAdmin`, `isSuper`. Sesión por cookie httpOnly (`pdp_session`).
+- **Sesión**: `SessionProvider` en el root layout; `useSession()` expone `user`, `loading`, `refresh`. Helpers `isAdmin`, `isSuper`. Sesión por cookie httpOnly (`pdp_session`) que guarda un **token de sesión aleatorio**; en BD (`sessions`) solo su hash, con expiración (30 días) y revocable al cerrar sesión. Helpers en `lib/api/auth.ts`: `createSession`, `requireUser`, `setSessionCookie`, `revokeSession`.
 - **Roles**: los roles son **por grupo** (`group_members.role` = `admin`|`player`). `users.role` solo distingue `super_admin` (control global); el resto son jugadores. `groups.admin_id` señala al dueño (admin irremovible). Ayudantes: `isGroupAdmin(user, group, membershipRole)` en `lib/groupRoles.ts`. Un usuario puede ser admin en un grupo y jugador en otro.
 
 ## Reglas de negocio clave
@@ -43,7 +43,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 
 - Esquema completo en `supabase/schema.sql` (se corre en el SQL editor del dashboard).
 - RLS habilitada pero **permissiva** (la llave anon puede leer/escribir todo): la autorización la hace la app (sesión + roles). Endurecer RLS si pasa a uso público.
-- Tablas: `users`, `groups`, `group_members`, `seasons`, `quedadas`, `quedada_players`, `matches`, `magic_links`, `audit_log`.
+- Tablas: `users`, `groups`, `group_members`, `seasons`, `quedadas`, `quedada_players`, `matches`, `magic_links`, `sessions`, `rate_limits`, `audit_log`.
 
 ## Variables de entorno
 

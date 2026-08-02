@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { createServiceClient } from '@/lib/supabase/service';
-import { SESSION_COOKIE } from '@/middleware';
+import { createSession, setSessionCookie } from '@/lib/api/auth';
 import type { PublicUser } from '@/lib/types';
 
 function toPublic(u: PublicUser & { pin_hash?: string | null }): PublicUser {
@@ -59,14 +59,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Usuario o PIN incorrecto.' }, { status: 401 });
   }
 
+  const token = await createSession(supabase, user.id);
   const res = NextResponse.json({ ok: true, user: toPublic(user) });
-  res.cookies.set(SESSION_COOKIE, user.id, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  setSessionCookie(res, token);
 
   await supabase.from('audit_log').insert({
     user_id: user.id,

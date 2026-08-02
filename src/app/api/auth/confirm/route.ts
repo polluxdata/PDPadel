@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { SESSION_COOKIE } from '@/middleware';
+import { createSession, setSessionCookie } from '@/lib/api/auth';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -94,13 +94,8 @@ export async function POST(req: NextRequest) {
   const redirectTo =
     ml.purpose === 'invite' && ml.group_id ? `/groups/${ml.group_id}` : '/';
 
+  const sessionToken = await createSession(supabase, userId);
   const res = NextResponse.json({ ok: true, redirectTo });
-  res.cookies.set(SESSION_COOKIE, userId, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  setSessionCookie(res, sessionToken);
   return res;
 }

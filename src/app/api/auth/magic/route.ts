@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { magicToken, confirmUrl } from '@/lib/magic';
 import { sendEmail } from '@/lib/mail';
+import { checkRateLimit } from '@/lib/api/rateLimit';
 
 interface Body {
   email?: string;
@@ -22,6 +23,17 @@ export async function POST(req: NextRequest) {
 
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return NextResponse.json({ ok: false, error: 'Ingresa un email válido.' }, { status: 400 });
+  }
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const supabase = createServiceClient();
+
+  // Rate limit: por email y por IP para evitar abuso de correos.
+  if (!(await checkRateLimit(supabase, `magic:${email}`, 3, 60_000))) {
+    return NextResponse.json({ ok: false, error: 'Demasiados intentos. Espera un momento.' }, { status: 429 });
+  }
+  if (!(await checkRateLimit(supabase, `magicip:${ip}`, 20, 60_000))) {
+    return NextResponse.json({ ok: false, error: 'Demasiados intentos. Espera un momento.' }, { status: 429 });
   }
 
   const username = body.username?.trim().toLowerCase() ?? '';
@@ -47,8 +59,6 @@ export async function POST(req: NextRequest) {
       );
     }
   }
-
-  const supabase = createServiceClient();
 
   // Invitación: validar el token del enlace compartido y enlazarlo al email.
   let invite: { group_id: string | null; role: string | null } | null = null;
