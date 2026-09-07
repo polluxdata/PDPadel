@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Users } from 'lucide-react';
+import { Info, Loader2, Users } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
+import FormatHelpModal from '@/components/FormatHelpModal';
 import { useSession } from '@/lib/session';
 import {
   DEFAULT_DURATION,
@@ -30,6 +31,7 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
   const [target, setTarget] = useState(DEFAULT_TARGET_SCORE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
 
   const needed = courts * PLAYERS_PER_COURT;
   const resting = format === 'mexicano' ? Math.max(0, selected.size - needed) : 0;
@@ -163,7 +165,17 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
             </div>
 
             <div>
-              <label className="label">Tipo de torneo</label>
+              <div className="mb-1 flex items-center gap-1.5">
+                <label className="label !mb-0">Tipo de torneo</label>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(true)}
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition hover:text-orange-400"
+                  aria-label="¿Cuál es la diferencia?"
+                >
+                  <Info size={15} />
+                </button>
+              </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setFormat('americano')}
                   className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (format === 'americano' ? 'border-orange-500 bg-orange-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
@@ -174,11 +186,6 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
                   Mexicano
                 </button>
               </div>
-              <p className="mt-2 text-xs text-slate-400">
-                {format === 'americano'
-                  ? 'Calendario completo de antemano: rotación de parejas para jugar con todos.'
-                  : 'Ronda 1 al azar; cada ronda siguiente se arma con la clasificación: 1.º + 4.º vs 2.º + 3.º por bloque de 4 (la cancha 1, los líderes). Se genera al completar todos los partidos.'}
-              </p>
             </div>
 
             <div>
@@ -277,6 +284,8 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
           </button>
         </form>
       </main>
+
+      {showHelp && <FormatHelpModal onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
