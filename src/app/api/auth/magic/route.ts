@@ -12,6 +12,7 @@ interface Body {
   firstName?: string;
   lastName?: string;
   nickname?: string;
+  consent?: boolean;
 }
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
@@ -96,6 +97,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Consentimiento expreso (LOPDP): obligatorio para el alta y para la
+  // invitación de un usuario nuevo (se crea cuenta al confirmar).
+  const needsConsent = mode === 'signup' || (mode === 'invite' && !userId);
+  if (needsConsent && body.consent !== true) {
+    return NextResponse.json(
+      { ok: false, error: 'Debes aceptar la Política de Privacidad.' },
+      { status: 400 }
+    );
+  }
+  const consentAt = needsConsent ? new Date().toISOString() : null;
+
   const payload =
     mode === 'signup'
       ? {
@@ -103,6 +115,7 @@ export async function POST(req: NextRequest) {
           firstName: body.firstName ?? '',
           lastName: body.lastName ?? '',
           nickname: null,
+          consentAt,
         }
       : null;
 
@@ -134,7 +147,7 @@ export async function POST(req: NextRequest) {
     action: 'request_magic_link',
     entity: 'magic_link',
     entity_id: ml.id,
-    details: { mode, email },
+    details: { mode, email, ...(consentAt ? { consentAt } : {}) },
   });
 
   const url = confirmUrl(token);

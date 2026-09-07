@@ -131,6 +131,16 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
       </div>
+
+      <p className="relative mt-6 text-xs text-slate-500">
+        Al usar PolluxPadel aceptas nuestra{' '}
+        <Link
+          href="/privacidad"
+          className="font-semibold text-slate-400 underline-offset-2 transition hover:text-orange-400 hover:underline"
+        >
+          Política de Privacidad
+        </Link>
+      </p>
     </main>
   );
 }

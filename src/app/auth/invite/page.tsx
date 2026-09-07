@@ -11,6 +11,7 @@ function InviteForm() {
   const token = params.get('token') ?? '';
   const { user, loading } = useSession();
   const [email, setEmail] = useState('');
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -39,7 +40,7 @@ function InviteForm() {
       const res = await fetch('/api/auth/magic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mode: 'invite', token }),
+        body: JSON.stringify({ email, mode: 'invite', token, consent: true }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -100,8 +101,32 @@ function InviteForm() {
               autoFocus
             />
           </div>
+          <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-orange-500"
+              required
+            />
+            <span className="text-xs leading-relaxed text-slate-300">
+              He leído y acepto la{' '}
+              <a
+                href="/privacidad"
+                target="_blank"
+                className="font-semibold text-orange-400 underline-offset-2 hover:underline"
+              >
+                Política de Privacidad
+              </a>
+              . Si aún no tienes cuenta, se creará una.
+            </span>
+          </label>
           {error && <p className="mt-3 text-center text-sm text-rose-400">{error}</p>}
-          <button type="submit" disabled={sending || !email} className="btn-primary mt-4 w-full">
+          <button
+            type="submit"
+            disabled={sending || !email || !consent}
+            className="btn-primary mt-4 w-full"
+          >
             {sending && <Loader2 size={16} className="animate-spin" />}
             Enviarme el enlace
           </button>

@@ -15,6 +15,7 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
   });
+  const [consent, setConsent] = useState(false);
   const [avail, setAvail] = useState<Availability>('idle');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,11 +47,15 @@ export default function RegisterPage() {
 
   const usernameValid = USERNAME_RE.test(form.username.trim().toLowerCase());
   const canSubmit =
-    usernameValid && avail === 'available' && form.email.trim() && form.firstName.trim();
+    usernameValid && avail === 'available' && form.email.trim() && form.firstName.trim() && consent;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (!consent) {
+      setError('Debes aceptar la Política de Privacidad para continuar.');
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch('/api/auth/magic', {
@@ -62,6 +67,7 @@ export default function RegisterPage() {
           username: form.username.trim().toLowerCase(),
           firstName: form.firstName,
           lastName: form.lastName,
+          consent: true,
         }),
       });
       const data = await res.json();
@@ -191,6 +197,27 @@ export default function RegisterPage() {
           <p className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-xs text-slate-400">
             Podrás cambiar tu apodo y otros datos desde tu perfil.
           </p>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-orange-500"
+              required
+            />
+            <span className="text-xs leading-relaxed text-slate-300">
+              He leído y acepto la{' '}
+              <Link
+                href="/privacidad"
+                target="_blank"
+                className="font-semibold text-orange-400 underline-offset-2 hover:underline"
+              >
+                Política de Privacidad
+              </Link>{' '}
+              y el tratamiento de mis datos conforme a la LOPDP.
+            </span>
+          </label>
 
           {error && <p className="text-sm text-rose-400">{error}</p>}
 

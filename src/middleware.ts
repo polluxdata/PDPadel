@@ -17,6 +17,7 @@ export function middleware(req: NextRequest) {
   if (
     pathname === '/login' ||
     pathname === '/register' ||
+    pathname === '/privacidad' ||
     pathname === '/auth/confirm' ||
     pathname === '/auth/invite'
   ) {
