@@ -51,6 +51,7 @@ export interface Season {
 
 export type MatchMode = 'points' | 'sets';
 export type MatchStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+export type QuedadaFormat = 'americano' | 'mexicano';
 
 export interface Quedada {
   id: string;
@@ -59,6 +60,7 @@ export interface Quedada {
   quedada_date: string | null;
   duration_minutes: number;
   courts: number;
+  format: QuedadaFormat;
   mode: MatchMode;
   target_score: number;
   max_sets: number;

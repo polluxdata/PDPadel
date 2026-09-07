@@ -22,6 +22,7 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
   - Segmentos: `groups/[id]` → prop `groupId`; `seasons/[seasonId]` → props `groupId` (ojo: el param del wrapper es `params.id`, no `params.groupId`) y `seasonId`; `quedadas/[qid]` → props `groupId` y `quedadaId`.
 - **Datos**: todo el fetch/mutación es por **API routes propias** (`/api/...`) que usan `SUPABASE_SERVICE_KEY` (service role, ignora RLS) y validan sesión + rol por grupo. El cliente **no toca Supabase** (la llave anon está bloqueada por RLS). Helpers: `requireUser()` y `getGroupRole()` en `lib/api/auth.ts`, cliente en `lib/supabase/service.ts`. **Rate limit**: `checkRateLimit()` en `lib/api/rateLimit.ts` (tabla `rate_limits`) aplicado en magic links (por email/IP) e invitaciones.
 - **Joins de partidos**: usar FK explícitas `p1:users!matches_player1_id_fkey(*)`, `p2:...player2_id...`, etc. (4 FK a la misma tabla; sin nombrarlas PostgREST puede resolver mal).
+- **Formatos de quedada**: `quedadas.format` = `americano` (calendario completo de antemano) | `mexicano` (ronda 1 al azar; rondas siguientes por clasificación). El marcador (`mode` puntos|sets) es independiente del formato. En Mexicano se necesita `courts*4` jugadores **como mínimo** (los que sobran descansan con rotación justa); en Americano exactamente `courts*4`.
 - **Sesión**: `SessionProvider` en el root layout; `useSession()` expone `user`, `loading`, `refresh`. Helpers `isAdmin`, `isSuper`. Sesión por cookie httpOnly (`pdp_session`) que guarda un **token de sesión aleatorio**; en BD (`sessions`) solo su hash, con expiración (30 días) y revocable al cerrar sesión. Helpers en `lib/api/auth.ts`: `createSession`, `requireUser`, `setSessionCookie`, `revokeSession`.
 - **Roles**: los roles son **por grupo** (`group_members.role` = `admin`|`player`). `users.role` solo distingue `super_admin` (control global); el resto son jugadores. `groups.admin_id` señala al dueño (admin irremovible). Ayudantes: `isGroupAdmin(user, group, membershipRole)` en `lib/groupRoles.ts`. Un usuario puede ser admin en un grupo y jugador en otro.
 
@@ -30,18 +31,20 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Una temporada activa por grupo**: índice único parcial `seasons_one_active_per_group`.
 - **Formato puntos**: primero en llegar a la meta (21/31/50) con 2 de ventaja (`WIN_BY = 2`).
 - **Formato set único sin fin**: NO es "al mejor de N". Se juega un solo set corrido; gana la pareja con más puntos al terminar el tiempo. No hay lista de sets ni selector de "al mejor de".
-- **Puntos de ranking**: modo puntos = 2 pts por victoria; modo sets = 1 pt (`SETS_WIN_POINTS`). El marcador (pointsFor/Against) siempre suma a la diferencia de desempate; `sets_details` es legado opcional.
+- **Puntos de ranking**: victoria = **2 pts siempre** (`WIN_POINTS`), sin importar el modo de marcador del partido (temporadas pueden mezclar partidos por puntos y por sets). Desempates en orden: % de victorias → **dif normalizada** (fracción ganada del marcador por partido: `puntos/(puntos+rival)`, comparable entre modos) → **head-to-head** entre empatados exactos → nombre. `sets_details` es legado opcional.
 - **Partidos**: no se pueden "saltar" (no hay botón). La quedada puede finalizar antes con "Finalizar quedada"; los pendientes no cuentan.
 - **Edición**: el admin puede editar resultados ya registrados (el marcador inline con "Guardar cambios"). `MatchScorer` sincroniza su estado con la prop `match` tras recargar.
-- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `remove_member`, `change_role`, `join_group`, `delete_user`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
+- **Trazabilidad**: cada mutación inserta en `audit_log` vía `audit(supabase, { userId, action, entity, entityId, details })` (helper en `lib/audit.ts`). Acciones típicas: `create_group`, `create_season`, `create_quedada`, `create_round`, `complete_match`, `finish_quedada`, `close_season`, `add_member`, `remove_member`, `change_role`, `join_group`, `delete_user`, `login`, `update_profile`, `request_magic_link`, `create_invite`, `accept_invite`, `magic_link_login`.
 
 ## Matchmaking
 
-`lib/matchmaking.ts`: método del círculo (1-factorization) para parejas + agrupación greedy para que cada jugador se enfrente a todos. Requiere múltiplo de 4 jugadores (`courts * 4`). Produce `n-1` rondas de `courts` partidos. Ya validado para 1–5 canchas.
+`lib/matchmaking.ts`:
+- **Americano**: método del círculo (1-factorization) para parejas + agrupación greedy para que cada jugador se enfrente a todos. Requiere múltiplo de 4 jugadores (`courts * 4`). Produce `n-1` rondas de `courts` partidos. Ya validado para 1–5 canchas.
+- **Mexicano** (`generateMexicanoRound`): ronda 1 al azar; siguientes desde la clasificación de la quedada (puntaje acumulado del marcador de cada jugador). Bloques de 4 por posición (cancha 1 = líderes) con cruce 1.º+4.º vs 2.º+3.º. Los que sobran descansan: descansan los de menos descansos acumulados, quien descansó la ronda anterior vuelve a la pista y el descanso nunca lo decide la tabla. La siguiente ronda se genera solo con la ronda anterior completa (`POST /api/quedadas/[id]/rounds`, admin).
 
 ## Base de datos (Supabase)
 
-- Esquema completo en `supabase/schema.sql` (se corre en el SQL editor del dashboard).
+- Esquema completo en `supabase/schema.sql` (se corre en el SQL editor del dashboard). Cambios sobre una BD ya creada: scripts `supabase/migrate-*.sql` (ej. `migrate-quedada-format.sql` agrega `quedadas.format`).
 - RLS habilitada pero **permissiva** (la llave anon puede leer/escribir todo): la autorización la hace la app (sesión + roles). Endurecer RLS si pasa a uso público.
 - Tablas: `users`, `groups`, `group_members`, `seasons`, `quedadas`, `quedada_players`, `matches`, `magic_links`, `sessions`, `rate_limits`, `audit_log`.
 

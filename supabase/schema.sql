@@ -83,6 +83,7 @@ create table if not exists public.quedadas (
   quedada_date date,
   duration_minutes int not null default 120,
   courts int not null default 1 check (courts between 1 and 5),
+  format text not null default 'americano' check (format in ('americano','mexicano')),
   mode text not null default 'points' check (mode in ('points','sets')),
   target_score int not null default 31,
   max_sets int not null default 3,

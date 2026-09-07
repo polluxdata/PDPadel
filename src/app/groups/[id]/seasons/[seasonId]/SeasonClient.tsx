@@ -194,6 +194,7 @@ export default function SeasonClient({
                       <div>
                         <p className="text-sm font-semibold">{q.name || 'Quedada'}</p>
                         <p className="text-xs text-slate-500">
+                          {q.format === 'mexicano' ? 'Mexicano · ' : ''}
                           {formatDate(q.quedada_date)} · {q.courts}{' '}
                           {q.courts === 1 ? 'cancha' : 'canchas'} ·{' '}
                           {q.mode === 'points' ? 'puntos' : 'sets'}

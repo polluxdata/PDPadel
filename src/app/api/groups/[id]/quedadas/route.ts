@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { requireUser, unauthorized } from '@/lib/api/auth';
 import { audit } from '@/lib/audit';
-import { generateMatches } from '@/lib/matchmaking';
+import { generateMatches, generateMexicanoRound } from '@/lib/matchmaking';
+import type { QuedadaFormat } from '@/lib/types';
 
-// POST /api/groups/[id]/quedadas → crear quedada (jugadores + partidos round-robin)
+// POST /api/groups/[id]/quedadas → crear quedada
+// (americano: todo el round-robin; mexicano: solo la ronda 1 al azar)
 export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
@@ -17,6 +19,7 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
     date?: string;
     duration?: number;
     courts?: number;
+    format?: QuedadaFormat;
     mode?: 'points' | 'sets';
     target?: number;
     playerIds?: string[];
@@ -24,9 +27,14 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
 
   const courts = body.courts ?? 1;
   const playerIds = body.playerIds ?? [];
+  const format: QuedadaFormat = body.format === 'mexicano' ? 'mexicano' : 'americano';
   const needed = courts * 4;
-  if (playerIds.length !== needed) {
-    return unauthorized(`Se necesitan exactamente ${needed} jugadores.`, 400);
+  if (format === 'americano') {
+    if (playerIds.length !== needed) {
+      return unauthorized(`Se necesitan exactamente ${needed} jugadores.`, 400);
+    }
+  } else if (playerIds.length < needed) {
+    return unauthorized(`Se necesitan al menos ${needed} jugadores (${courts} canchas).`, 400);
   }
   if (!body.seasonId) return unauthorized('Falta la temporada', 400);
 
@@ -50,6 +58,7 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
       quedada_date: body.date || new Date().toISOString().slice(0, 10),
       duration_minutes: body.duration ?? 120,
       courts,
+      format,
       mode: body.mode ?? 'points',
       target_score: body.target ?? 31,
       created_by: user.id,
@@ -62,9 +71,12 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
     playerIds.map((user_id) => ({ quedada_id: quedada.id, user_id }))
   );
 
-  const generated = generateMatches(playerIds, courts);
+  const generated =
+    format === 'mexicano'
+      ? generateMexicanoRound({ roundNumber: 1, playerIds, courts })
+      : { matches: generateMatches(playerIds, courts), resting: [] as string[] };
   const { error: mErr } = await supabase.from('matches').insert(
-    generated.map((m) => ({
+    generated.matches.map((m) => ({
       quedada_id: quedada.id,
       round_number: m.round,
       court_number: m.court,
@@ -78,6 +90,12 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
   );
   if (mErr) return unauthorized('Se creó la quedada pero fallaron los partidos: ' + mErr.message, 500);
 
-  await audit(supabase, { userId: user.id, action: 'create_quedada', entity: 'quedada', entityId: quedada.id, details: { courts, mode: body.mode ?? 'points', players: playerIds.length } });
-  return NextResponse.json({ ok: true, quedada });
+  await audit(supabase, {
+    userId: user.id,
+    action: 'create_quedada',
+    entity: 'quedada',
+    entityId: quedada.id,
+    details: { courts, format, mode: body.mode ?? 'points', players: playerIds.length },
+  });
+  return NextResponse.json({ ok: true, quedada, resting: generated.resting });
 }

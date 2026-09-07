@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Flag, Loader2, Users } from 'lucide-react';
+import { Flag, Loader2, Plus, Users } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import MatchCard from '@/components/MatchCard';
 import { useSession } from '@/lib/session';
@@ -26,6 +26,8 @@ export default function QuedadaClient({
   const [error, setError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [activeRound, setActiveRound] = useState(1);
+  const [generating, setGenerating] = useState(false);
+  const [restingNote, setRestingNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +54,37 @@ export default function QuedadaClient({
     load();
   }, [load]);
 
+  async function generateRound() {
+    if (!quedada || !user) return;
+    if (!confirm(`¿Armar la ronda ${lastRound + 1} con la clasificación actual?`)) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/quedadas/${quedada.id}/rounds`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'No se pudo generar la ronda.');
+        setGenerating(false);
+        return;
+      }
+      const restingIds: string[] = data.resting ?? [];
+      const names = restingIds
+        .map((id) => players.find((p) => p.id === id))
+        .filter(Boolean)
+        .map((p) => displayName(p as User));
+      setRestingNote(
+        names.length > 0
+          ? `Ronda ${data.round}: descansan ${names.join(', ')}.`
+          : null
+      );
+      await load();
+      setActiveRound(data.round);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      alert('Error al generar la ronda.');
+    }
+    setGenerating(false);
+  }
+
   async function finishQuedada() {
     if (!quedada || !user) return;
     const pending = matches.filter((m) => m.status === 'pending' || m.status === 'in_progress');
@@ -70,6 +103,10 @@ export default function QuedadaClient({
   const rounds = Array.from(new Set(matches.map((m) => m.round_number)));
   const total = matches.length;
   const done = matches.filter((m) => m.status === 'completed' || m.status === 'skipped').length;
+  const lastRound = rounds.length > 0 ? Math.max(...rounds) : 0;
+  const lastRoundMatches = matches.filter((m) => m.round_number === lastRound);
+  const lastRoundComplete =
+    lastRound === 0 || lastRoundMatches.every((m) => m.status === 'completed');
 
   // Solo al cargar por primera vez, ir a la primera ronda con juego pendiente.
   // (Después el usuario navega libremente, incluyendo rondas ya jugadas.)
@@ -148,7 +185,7 @@ export default function QuedadaClient({
     <div>
       <AppHeader
         title={quedada.name || 'Quedada'}
-        subtitle={`${formatDate(quedada.quedada_date)} · ${quedada.courts} ${quedada.courts === 1 ? 'cancha' : 'canchas'} · ${MODE_LABELS[quedada.mode]}`}
+        subtitle={`${quedada.format === 'mexicano' ? 'Mexicano · ' : ''}${formatDate(quedada.quedada_date)} · ${quedada.courts} ${quedada.courts === 1 ? 'cancha' : 'canchas'} · ${MODE_LABELS[quedada.mode]}`}
         backHref={`/groups/${groupId}`}
       />
 
@@ -170,6 +207,26 @@ export default function QuedadaClient({
           <p className="py-8 text-center text-sm text-slate-400">Sin partidos generados.</p>
         ) : (
           <>
+            {quedada.status === 'active' && isAdminHere && quedada.format === 'mexicano' && (
+              <div className="mb-4 flex flex-col gap-2 rounded-xl border border-orange-800 bg-orange-950/20 px-4 py-3">
+                {restingNote && <p className="text-xs text-slate-300">{restingNote}</p>}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-slate-400">
+                    {lastRoundComplete
+                      ? 'Ronda completa: ya puedes armar la siguiente con la clasificación.'
+                      : `Completa los ${lastRoundMatches.filter((m) => m.status !== 'completed').length} partido(s) de la ronda ${lastRound} para armar la siguiente.`}
+                  </p>
+                  <button
+                    onClick={generateRound}
+                    disabled={!lastRoundComplete || generating}
+                    className="btn-primary flex shrink-0 items-center gap-1.5 !py-2 text-sm disabled:opacity-40"
+                  >
+                    {generating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                    Ronda {lastRound + 1}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="mb-5 grid grid-cols-2 gap-3">
               <div className="card text-center">
                 <p className="text-2xl font-extrabold text-orange-400">{done}/{total}</p>

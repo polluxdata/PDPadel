@@ -12,7 +12,7 @@ import {
   SCORE_TARGETS,
 } from '@/lib/constants';
 import { displayName, cn } from '@/lib/utils';
-import type { Group, Season, User } from '@/lib/types';
+import type { Group, QuedadaFormat, Season, User } from '@/lib/types';
 
 export default function NewQuedadaClient({ groupId }: { groupId: string }) {
   const router = useRouter();
@@ -25,12 +25,14 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [courts, setCourts] = useState(1);
   const [duration, setDuration] = useState(DEFAULT_DURATION);
+  const [format, setFormat] = useState<QuedadaFormat>('americano');
   const [mode, setMode] = useState<'points' | 'sets'>('points');
   const [target, setTarget] = useState(DEFAULT_TARGET_SCORE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const needed = courts * PLAYERS_PER_COURT;
+  const resting = format === 'mexicano' ? Math.max(0, selected.size - needed) : 0;
 
   useEffect(() => {
     (async () => {
@@ -56,8 +58,12 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
     e.preventDefault();
     setError('');
     if (!user || !season) return;
-    if (selected.size !== needed) {
+    if (format === 'americano' && selected.size !== needed) {
       setError(`Selecciona exactamente ${needed} jugadores (${courts} × ${PLAYERS_PER_COURT}).`);
+      return;
+    }
+    if (format === 'mexicano' && selected.size < needed) {
+      setError(`Selecciona al menos ${needed} jugadores (${courts} × ${PLAYERS_PER_COURT}).`);
       return;
     }
     setSaving(true);
@@ -72,6 +78,7 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
           date,
           duration,
           courts,
+          format,
           mode,
           target,
           playerIds: Array.from(selected),
@@ -156,7 +163,26 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
             </div>
 
             <div>
-              <label className="label">Formato</label>
+              <label className="label">Tipo de torneo</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setFormat('americano')}
+                  className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (format === 'americano' ? 'border-orange-500 bg-orange-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
+                  Americano
+                </button>
+                <button type="button" onClick={() => setFormat('mexicano')}
+                  className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (format === 'mexicano' ? 'border-orange-500 bg-orange-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
+                  Mexicano
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">
+                {format === 'americano'
+                  ? 'Calendario completo de antemano: rotación de parejas para jugar con todos.'
+                  : 'Ronda 1 al azar; cada ronda siguiente se arma con la clasificación: 1.º + 4.º vs 2.º + 3.º por bloque de 4 (la cancha 1, los líderes). Se genera al completar todos los partidos.'}
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Marcador</label>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setMode('points')}
                   className={'flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ' + (mode === 'points' ? 'border-orange-500 bg-orange-500 text-slate-950' : 'border-slate-700 bg-slate-800 text-slate-300')}>
@@ -194,10 +220,16 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
               <span
                 className={cn(
                   'font-mono text-sm font-bold',
-                  selected.size === needed ? 'text-orange-400' : 'text-amber-400'
+                  format === 'americano'
+                    ? selected.size === needed
+                      ? 'text-orange-400'
+                      : 'text-amber-400'
+                    : selected.size >= needed
+                      ? 'text-orange-400'
+                      : 'text-amber-400'
                 )}
               >
-                {selected.size}/{needed}
+                {selected.size}/{format === 'americano' ? needed : `${needed}+`}
               </span>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -231,7 +263,9 @@ export default function NewQuedadaClient({ groupId }: { groupId: string }) {
             </div>
             <p className="mt-3 text-xs text-slate-500">
               <Users size={12} className="mr-1 inline" />
-              Se necesitan {needed} jugadores ({courts} × {PLAYERS_PER_COURT}).
+              {format === 'americano'
+                ? `Se necesitan ${needed} jugadores (${courts} × ${PLAYERS_PER_COURT}).`
+                : `Mínimo ${needed} jugadores (${courts} × ${PLAYERS_PER_COURT}).${resting > 0 ? ` ${resting} descansarán cada ronda.` : ''}`}
             </p>
           </div>
 

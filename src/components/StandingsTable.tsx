@@ -32,7 +32,9 @@ export default function StandingsTable({
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            const diff = r.pointsFor - r.pointsAgainst + (r.setsFor - r.setsAgainst);
+            // Diferencia normalizada: fracción ganada del marcador por partido
+            // (comparable entre partidos por puntos y por sets), en %.
+            const dif = Math.round(r.normDiff * 1000) / 10;
             const mine = highlightUserId === r.userId;
             return (
               <tr
@@ -63,9 +65,12 @@ export default function StandingsTable({
                 <td className="px-2 py-2.5 text-center text-rose-400">{r.losses}</td>
                 <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-300">
                   {r.points}
-                  {diff !== 0 && (
-                    <span className="ml-1 text-[10px] font-normal text-slate-500">
-                      {diff > 0 ? `+${diff}` : diff}
+                  {dif !== 0 && (
+                    <span
+                      className="ml-1 text-[10px] font-normal text-slate-500"
+                      title="Diferencia de marcador normalizada (%)"
+                    >
+                      {dif > 0 ? `+${dif}` : dif}
                     </span>
                   )}
                 </td>
