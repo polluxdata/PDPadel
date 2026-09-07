@@ -9,9 +9,9 @@ Mobile-first (Next.js 14 + TypeScript + Tailwind CSS + Supabase), instalable y d
 - **Grupos**: cada grupo tiene un **código único** para unirse. Al crear un grupo quedas como su **administrador**.
 - **Roles por grupo**: `group_members.role` = `admin` | `player`. Un usuario puede ser **admin en un grupo y jugador en otro**.
 - **Temporadas**: una sola activa por grupo. Al cerrarla se calcula el ganador y queda en solo lectura.
-- **Quedadas** (jornadas) dentro de una temporada: canchas, duración, formato (puntos o set único) y participantes.
-- **Partidos**: round-robin automático (cada jugador hace pareja con todos y se enfrenta a todos), distribuidos en rondas según canchas.
-- **Ranking** por temporada: 2 puntos por partido ganado en modo puntos, 1 punto en modo set; el marcador suma a la diferencia como desempate.
+- **Quedadas** (jornadas) dentro de una temporada: canchas, duración, tipo (Americano o Mexicano), marcador (puntos o set único) y participantes.
+- **Partidos**: Americano con round-robin automático (cada jugador hace pareja con todos y se enfrenta a todos); Mexicano con rondas armadas por clasificación.
+- **Ranking** por temporada: 2 puntos por partido ganado (sin importar el modo del marcador, se pueden mezclar partidos por puntos y por sets). Desempates: % de victorias → diferencia normalizada del marcador (fracción ganada por partido, comparable entre modos) → head-to-head → nombre.
 - **Auditoría** (`audit_log`): trazabilidad de quién crea grupos, usuarios, temporadas, quedadas y partidos.
 
 ## Acceso
@@ -31,15 +31,18 @@ Mobile-first (Next.js 14 + TypeScript + Tailwind CSS + Supabase), instalable y d
 
 ## Formatos de juego
 
-- **Puntos**: primero en llegar a la meta (21/31/50) con 2 de ventaja.
-- **Set único sin fin**: un solo set corrido durante el tiempo de la ronda; gana la pareja con más puntos. No hay "al mejor de N".
+- **Tipo Americano**: el calendario completo se arma de antemano; rotación de parejas para jugar con y contra todos. Exactamente `canchas × 4` jugadores.
+- **Tipo Mexicano**: la ronda 1 se sortea al azar y cada ronda siguiente se arma con la clasificación de la quedada (puntaje acumulado): bloques de 4 por cancha — la 1 con los líderes — y cruce 1.º + 4.º vs 2.º + 3.º. Se genera al completar todos los partidos de la ronda. `canchas × 4` jugadores como mínimo; los que sobran descansan con rotación justa.
+- **Marcador (independiente del tipo)**:
+  - **Puntos**: primero en llegar a la meta (21/31/50) con 2 de ventaja.
+  - **Set único sin fin**: un solo set corrido durante el tiempo de la ronda; gana la pareja con más puntos. No hay "al mejor de N".
 
 ## Flujo en la app
 
 1. Login o registro por correo (magic link).
 2. Inicio: tus grupos, su código y su temporada en curso. Botones para **crear grupo** o **unirte con código**.
 3. Grupo: clasificación (con tu puesto), enlace directo a la quedada activa y (si eres admin) crear temporada/quedada y administrar jugadores.
-4. Quedada: una ronda por pantalla con navegación (‹ › y chips). El admin registra cada partido **inline** (marcador con − / +) y puede editar resultados ya registrados.
+4. Quedada: una ronda por pantalla con navegación (‹ › y chips). El admin registra cada partido **inline** (marcador con − / +) y puede editar resultados ya registrados. En las mexicanas, al completar la ronda aparece el botón para **armar la siguiente** con la clasificación.
 5. Finalizar la quedada suma los puntos al ranking de la temporada.
 6. Cerrar la temporada → ganador calculado, solo lectura.
 
