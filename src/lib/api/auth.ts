@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { SESSION_COOKIE } from '@/middleware';
+import { SESSION_COOKIE } from '@/lib/sessionCookie';
 import type { PublicUser } from '@/lib/types';
 
 export const SESSION_DAYS = 30;

@@ -7,11 +7,11 @@ const MATCH_SELECT =
   '*, p1:users!matches_player1_id_fkey(*), p2:users!matches_player2_id_fkey(*), p3:users!matches_player3_id_fkey(*), p4:users!matches_player4_id_fkey(*)';
 
 // GET /api/quedadas/[id] → detalle de quedada
-export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const qid = ctx.params.id;
+  const qid = (await ctx.params).id;
 
   const [{ data: quedada }, { data: matches }, { data: players }] = await Promise.all([
     supabase.from('quedadas').select('*').eq('id', qid).maybeSingle(),
@@ -38,11 +38,11 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
 }
 
 // POST /api/quedadas/[id]/finish → finalizar quedada (admin)
-export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const qid = ctx.params.id;
+  const qid = (await ctx.params).id;
 
   const { data: quedada } = await supabase.from('quedadas').select('*').eq('id', qid).maybeSingle();
   if (!quedada) return unauthorized('Quedada no encontrada', 404);

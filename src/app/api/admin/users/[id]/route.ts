@@ -4,12 +4,12 @@ import { requireUser, unauthorized } from '@/lib/api/auth';
 import { audit } from '@/lib/audit';
 
 // DELETE /api/admin/users/[id] → borrar usuario (super admin)
-export async function DELETE(req: NextRequest, ctx: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   if (user.role !== 'super_admin') return unauthorized('Solo super admin', 403);
   const supabase = createServiceClient();
-  const targetId = ctx.params.id;
+  const targetId = (await ctx.params).id;
 
   if (targetId === user.id) return unauthorized('No puedes borrarte a ti mismo', 400);
   const { data: target } = await supabase.from('users').select('id, role, username').eq('id', targetId).maybeSingle();

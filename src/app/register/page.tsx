@@ -26,16 +26,21 @@ export default function RegisterPage() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Validar disponibilidad del usuario (con debounce).
+  // Validar disponibilidad del usuario (con debounce). El setState se difiere
+  // a una microtarea: corre antes del paint (mismo efecto visual) y evita
+  // cascadas de render dentro del efecto.
   useEffect(() => {
     const value = form.username.trim().toLowerCase();
-    if (!USERNAME_RE.test(value)) {
-      setAvail('idle');
-      return;
-    }
-    setAvail('checking');
+    const task = Promise.resolve().then(() => {
+      if (!USERNAME_RE.test(value)) {
+        setAvail('idle');
+        return;
+      }
+      setAvail('checking');
+    });
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
+      await task;
       const res = await fetch(`/api/users/check?username=${encodeURIComponent(value)}`);
       const data = await res.json();
       setAvail(data.available ? 'available' : 'taken');

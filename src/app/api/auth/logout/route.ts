@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { revokeSession } from '@/lib/api/auth';
-import { SESSION_COOKIE } from '@/middleware';
+import { SESSION_COOKIE } from '@/lib/sessionCookie';
 
 export async function POST(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;

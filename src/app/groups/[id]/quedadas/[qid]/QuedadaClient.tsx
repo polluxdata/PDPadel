@@ -31,8 +31,8 @@ export default function QuedadaClient({
 
   const load = useCallback(async () => {
     try {
-      setError(null);
       const res = await fetch(`/api/quedadas/${quedadaId}`);
+      setError(null);
       const data = await res.json();
       if (!data.ok) {
         setError(data.error || 'No se pudo cargar la quedada.');
@@ -51,6 +51,7 @@ export default function QuedadaClient({
   }, [quedadaId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- // setState ocurre tras await: carga de datos, sin cascada síncrona
     load();
   }, [load]);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Save } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
@@ -21,17 +21,19 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  useEffect(() => {
-    if (user) {
-      setForm({
-        firstName: user.first_name ?? '',
-        lastName: user.last_name ?? '',
-        email: user.email ?? '',
-        nickname: user.nickname ?? '',
-        listed: user.listed ?? true,
-      });
-    }
-  }, [user]);
+  // Ajuste de formulario cuando cambia la sesión (patrón React: setState en
+  // render con condición, evitando cascadas por efecto).
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
+  if (user && user.id !== lastUserId) {
+    setLastUserId(user.id);
+    setForm({
+      firstName: user.first_name ?? '',
+      lastName: user.last_name ?? '',
+      email: user.email ?? '',
+      nickname: user.nickname ?? '',
+      listed: user.listed ?? true,
+    });
+  }
 
   function set<K extends keyof typeof form>(key: K, value: string | boolean) {
     setForm((f) => ({ ...f, [key]: value }));

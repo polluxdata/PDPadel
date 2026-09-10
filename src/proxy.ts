@@ -1,10 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-
-export const SESSION_COOKIE = 'pdp_session';
+import { SESSION_COOKIE } from '@/lib/sessionCookie';
 
 const STATIC_ASSET = /\.(png|jpg|jpeg|svg|webp|gif|ico|txt|xml|webmanifest)$/i;
 
-export function middleware(req: NextRequest) {
+export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Assets estáticos (imágenes de la PWA, portada, etc.): servir sin sesión.

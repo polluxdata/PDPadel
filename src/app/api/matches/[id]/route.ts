@@ -4,11 +4,11 @@ import { requireUser, unauthorized } from '@/lib/api/auth';
 import { audit } from '@/lib/audit';
 
 // POST /api/matches/[id] → registrar/editar resultado (admin del grupo del season)
-export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const mid = ctx.params.id;
+  const mid = (await ctx.params).id;
 
   const body = (await req.json().catch(() => ({}))) as {
     score1?: number;

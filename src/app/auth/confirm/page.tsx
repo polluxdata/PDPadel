@@ -11,15 +11,14 @@ function ConfirmView() {
   const params = useSearchParams();
   const { refresh } = useSession();
   const token = params.get('token') ?? '';
-  const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
-  const [error, setError] = useState('');
+  const hasToken = token !== '';
+  const [state, setState] = useState<'loading' | 'ok' | 'error'>(
+    hasToken ? 'loading' : 'error'
+  );
+  const [error, setError] = useState(hasToken ? '' : 'Enlace inválido.');
 
   useEffect(() => {
-    if (!token) {
-      setError('Enlace inválido.');
-      setState('error');
-      return;
-    }
+    if (!token) return;
     (async () => {
       try {
         const res = await fetch('/api/auth/confirm', {

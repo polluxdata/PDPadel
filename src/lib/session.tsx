@@ -38,6 +38,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- // setState ocurre tras await: carga de datos, sin cascada síncrona
     refresh();
   }, [refresh]);
 

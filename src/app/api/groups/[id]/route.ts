@@ -6,11 +6,11 @@ import { audit } from '@/lib/audit';
 const MATCH_SELECT =
   '*, p1:users!matches_player1_id_fkey(*), p2:users!matches_player2_id_fkey(*), p3:users!matches_player3_id_fkey(*), p4:users!matches_player4_id_fkey(*)';
 
-export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   const supabase = createServiceClient();
-  const groupId = ctx.params.id;
+  const groupId = (await ctx.params).id;
 
   const [{ data: group }, { data: members }, { data: mine }] = await Promise.all([
     supabase.from('groups').select('*').eq('id', groupId).maybeSingle(),
@@ -66,11 +66,11 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
   });
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   const supabase = createServiceClient();
-  const groupId = ctx.params.id;
+  const groupId = (await ctx.params).id;
 
   const { data: group } = await supabase.from('groups').select('admin_id').eq('id', groupId).maybeSingle();
   if (!group) return NextResponse.json({ ok: false, error: 'Grupo no encontrado' }, { status: 404 });

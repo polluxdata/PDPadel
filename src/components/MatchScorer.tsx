@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Loader2, Minus, Plus } from 'lucide-react';
 import { SCORE_TARGETS } from '@/lib/constants';
 import { displayName } from '@/lib/utils';
@@ -26,10 +26,25 @@ export default function MatchScorer({
   const [saving, setSaving] = useState(false);
 
   // Al recargar (tras guardar/editar), sincronizar el marcador con lo guardado.
-  useEffect(() => {
+  // Patrón React: ajuste de estado en render con condición (sin efecto).
+  const [synced, setSynced] = useState({
+    id: match.id,
+    s1: match.score_team1,
+    s2: match.score_team2,
+  });
+  if (
+    synced.id !== match.id ||
+    synced.s1 !== match.score_team1 ||
+    synced.s2 !== match.score_team2
+  ) {
+    setSynced({
+      id: match.id,
+      s1: match.score_team1,
+      s2: match.score_team2,
+    });
     setScore1(match.score_team1);
     setScore2(match.score_team2);
-  }, [match.id, match.score_team1, match.score_team2]);
+  }
 
   // Puntos: primero en llegar a la meta con 2 de ventaja.
   const pointsWinner =

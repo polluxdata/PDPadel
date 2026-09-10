@@ -10,11 +10,11 @@ import type { User } from '@/lib/types';
 // Solo disponible cuando la ronda anterior está completa: la clasificación de
 // la quedada define parejas (1.º+4.º vs 2.º+3.º, cancha 1 = líderes) y los
 // descansos se reparten de forma justa.
-export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const qid = ctx.params.id;
+  const qid = (await ctx.params).id;
 
   const [{ data: quedada }, { data: matches }, { data: playerRows }] = await Promise.all([
     supabase.from('quedadas').select('*').eq('id', qid).maybeSingle(),

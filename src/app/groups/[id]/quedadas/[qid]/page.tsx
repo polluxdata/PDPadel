@@ -1,9 +1,10 @@
 import QuedadaClient from './QuedadaClient';
 
-export default function QuedadaPage({
+export default async function QuedadaPage({
   params,
 }: {
-  params: { id: string; qid: string };
+  params: Promise<{ id: string; qid: string }>;
 }) {
-  return <QuedadaClient groupId={params.id} quedadaId={params.qid} />;
+  const { id, qid } = await params;
+  return <QuedadaClient groupId={id} quedadaId={qid} />;
 }

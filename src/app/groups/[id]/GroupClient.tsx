@@ -26,8 +26,8 @@ export default function GroupClient({ groupId }: { groupId: string }) {
 
   const load = useCallback(async () => {
     try {
-      setError(null);
       const res = await fetch(`/api/groups/${groupId}`);
+      setError(null);
       const data = await res.json();
       if (!data.ok) {
         setError(data.error || 'No se pudo cargar el grupo.');
@@ -48,6 +48,7 @@ export default function GroupClient({ groupId }: { groupId: string }) {
   }, [groupId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- // setState ocurre tras await: carga de datos, sin cascada síncrona
     load();
   }, [load]);
 

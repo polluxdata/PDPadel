@@ -38,6 +38,7 @@ export default function MembersClient({ groupId }: { groupId: string }) {
   }, [groupId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- // setState ocurre tras await: carga de datos, sin cascada síncrona
     load();
   }, [load]);
 

@@ -31,8 +31,8 @@ export default function SeasonClient({
 
   const load = useCallback(async () => {
     try {
-      setError(null);
       const res = await fetch(`/api/seasons/${seasonId}`);
+      setError(null);
       const data = await res.json();
       if (!data.ok) {
         setError(data.error || 'No se pudo cargar la temporada.');
@@ -53,6 +53,7 @@ export default function SeasonClient({
   }, [seasonId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- // setState ocurre tras await: carga de datos, sin cascada síncrona
     load();
   }, [load]);
 

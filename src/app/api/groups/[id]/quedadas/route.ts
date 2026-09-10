@@ -7,11 +7,11 @@ import type { QuedadaFormat } from '@/lib/types';
 
 // POST /api/groups/[id]/quedadas → crear quedada
 // (americano: todo el round-robin; mexicano: solo la ronda 1 al azar)
-export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const groupId = ctx.params.id;
+  const groupId = (await ctx.params).id;
 
   const body = (await req.json().catch(() => ({}))) as {
     seasonId?: string;

@@ -1,5 +1,5 @@
 import NewQuedadaClient from './NewQuedadaClient';
 
-export default function NewQuedadaPage({ params }: { params: { id: string } }) {
-  return <NewQuedadaClient groupId={params.id} />;
+export default async function NewQuedadaPage({ params }: { params: Promise<{ id: string }> }) {
+  return <NewQuedadaClient groupId={(await params).id} />;
 }

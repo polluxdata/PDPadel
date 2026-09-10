@@ -1,5 +1,5 @@
 import GroupClient from './GroupClient';
 
-export default function GroupPage({ params }: { params: { id: string } }) {
-  return <GroupClient groupId={params.id} />;
+export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
+  return <GroupClient groupId={(await params).id} />;
 }

@@ -8,11 +8,11 @@ const MATCH_SELECT =
   '*, p1:users!matches_player1_id_fkey(*), p2:users!matches_player2_id_fkey(*), p3:users!matches_player3_id_fkey(*), p4:users!matches_player4_id_fkey(*)';
 
 // GET /api/seasons/[id] → detalle (grupo, membresías, quedadas, partidos, ranking)
-export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const seasonId = ctx.params.id;
+  const seasonId = (await ctx.params).id;
 
   const { data: season } = await supabase.from('seasons').select('*').eq('id', seasonId).maybeSingle();
   if (!season) return unauthorized('Temporada no encontrada', 404);
@@ -62,11 +62,11 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
 }
 
 // POST /api/seasons/[id]/close → cerrar temporada (calcula ganador)
-export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);
   const supabase = createServiceClient();
-  const seasonId = ctx.params.id;
+  const seasonId = (await ctx.params).id;
 
   const { data: season } = await supabase.from('seasons').select('*').eq('id', seasonId).maybeSingle();
   if (!season) return unauthorized('Temporada no encontrada', 404);

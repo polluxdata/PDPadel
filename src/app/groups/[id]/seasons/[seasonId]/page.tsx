@@ -1,9 +1,10 @@
 import SeasonClient from './SeasonClient';
 
-export default function SeasonPage({
+export default async function SeasonPage({
   params,
 }: {
-  params: { id: string; seasonId: string };
+  params: Promise<{ id: string; seasonId: string }>;
 }) {
-  return <SeasonClient groupId={params.id} seasonId={params.seasonId} />;
+  const { id, seasonId } = await params;
+  return <SeasonClient groupId={id} seasonId={seasonId} />;
 }

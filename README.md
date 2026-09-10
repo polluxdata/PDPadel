@@ -1,7 +1,7 @@
 # PolluxPadel
 
 PWA de **Pádel Americano**: grupos de jugadores, temporadas, quedadas y ranking en vivo.
-Mobile-first (Next.js 14 + TypeScript + Tailwind CSS + Supabase), instalable y desplegada en Vercel.
+Mobile-first (Next.js 16 + React 19 + TypeScript + Tailwind CSS + Supabase + Serwist), instalable y desplegada en Vercel.
 
 ## Modelo de datos
 

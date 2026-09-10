@@ -4,7 +4,7 @@ Guía de contexto para agentes de IA que trabajen en este repositorio.
 
 ## Proyecto
 
-PWA de Pádel Americano (Next.js 14 App Router + TypeScript + Tailwind + Supabase + next-pwa). Mobile-first. Acceso por **magic link** (email); PIN solo como respaldo del superadmin. En producción: https://ppadel.polluxdata.com (Vercel).
+PWA de Pádel Americano (Next.js 16 App Router + React 19 + TypeScript + Tailwind + Supabase + Serwist). Mobile-first. Acceso por **magic link** (email); PIN solo como respaldo del superadmin. En producción: https://ppadel.polluxdata.com (Vercel).
 
 ## Comandos útiles
 
@@ -24,7 +24,8 @@ Siempre correr `npm run build` y `npm run lint` tras cambios. El build además v
 - **Joins de partidos**: usar FK explícitas `p1:users!matches_player1_id_fkey(*)`, `p2:...player2_id...`, etc. (4 FK a la misma tabla; sin nombrarlas PostgREST puede resolver mal).
 - **Formatos de quedada**: `quedadas.format` = `americano` (calendario completo de antemano) | `mexicano` (ronda 1 al azar; rondas siguientes por clasificación). El marcador (`mode` puntos|sets) es independiente del formato. En Mexicano se necesita `courts*4` jugadores **como mínimo** (los que sobran descansan con rotación justa); en Americano exactamente `courts*4`.
 - **Sesión**: `SessionProvider` en el root layout; `useSession()` expone `user`, `loading`, `refresh`. Helpers `isAdmin`, `isSuper`. Sesión por cookie httpOnly (`pdp_session`) que guarda un **token de sesión aleatorio**; en BD (`sessions`) solo su hash, con expiración (30 días) y revocable al cerrar sesión. Helpers en `lib/api/auth.ts`: `createSession`, `requireUser`, `setSessionCookie`, `revokeSession`.
-- **LOPDP**: página pública `/privacidad` (sin sesión, exenta en `middleware.ts`) con la política de la app; enlace desde la portada. El **consentimiento expreso** es obligatorio para crear cuenta: checkbox en `/register` y en la invitación de usuario nuevo (`/auth/invite`), y validación en el servidor (`POST /api/auth/magic` exige `consent: true` para `signup` y para `invite` de email no registrado). El consentimiento queda trazado en `audit_log` (`details.consentAt`) y en el payload del magic link de signup.
+- **LOPDP**: página pública `/privacidad` (sin sesión, exenta en `proxy.ts`) con la política de la app; enlace desde la portada. El **consentimiento expreso** es obligatorio para crear cuenta: checkbox en `/register` y en la invitación de usuario nuevo (`/auth/invite`), y validación en el servidor (`POST /api/auth/magic` exige `consent: true` para `signup` y para `invite` de email no registrado). El consentimiento queda trazado en `audit_log` (`details.consentAt`) y en el payload del magic link de signup.
+- **Plataforma (Next 16)**: `params`/`searchParams` son **Promise** — los server wrappers hacen `await params` y las API routes `await ctx.params`. El middleware de sesión vive en `src/proxy.ts` (renombrado desde `middleware.ts`); la constante `SESSION_COOKIE` está en `lib/sessionCookie.ts`. El service worker lo genera **Serwist** (`src/app/sw.ts` → `public/sw.js`, reemplazó a next-pwa/Workbox); como Serwist aún no soporta Turbopack, el build corre con webpack (`next build --webpack`). El lint es ESLint 9 flat config (`eslint.config.mjs`, `npm run lint` = `eslint .`).
 - **Roles**: los roles son **por grupo** (`group_members.role` = `admin`|`player`). `users.role` solo distingue `super_admin` (control global); el resto son jugadores. `groups.admin_id` señala al dueño (admin irremovible). Ayudantes: `isGroupAdmin(user, group, membershipRole)` en `lib/groupRoles.ts`. Un usuario puede ser admin en un grupo y jugador en otro.
 
 ## Reglas de negocio clave
