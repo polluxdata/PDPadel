@@ -1,9 +1,107 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { requireUser, unauthorized } from '@/lib/api/auth';
+import { audit } from '@/lib/audit';
+import { magicToken, confirmUrl } from '@/lib/magic';
+import { sendEmail } from '@/lib/mail';
 
-// GET /api/admin/users?page=&q=&filter= → paginado, filtros y membresías
-// DELETE /api/admin/users/[id] → borrar usuario (super admin)
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
+
+// POST /api/admin/users → alta directa de usuario (solo super admin).
+// Pensado para jugadores que no pueden registrarse solos: el admin captura
+// nombre, usuario y email; opcionalmente les envía un enlace de acceso.
+export async function POST(req: NextRequest) {
+  const { user, error } = await requireUser(req);
+  if (error) return unauthorized(error.message, error.status);
+  if (user.role !== 'super_admin') return unauthorized('Solo super admin', 403);
+  const supabase = createServiceClient();
+
+  const body = (await req.json().catch(() => ({}))) as {
+    username?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    notify?: boolean;
+  };
+  const username = body.username?.trim().toLowerCase() ?? '';
+  const email = body.email?.trim().toLowerCase() ?? '';
+  const firstName = body.firstName?.trim() ?? '';
+  const lastName = body.lastName?.trim() ?? '';
+
+  if (!USERNAME_RE.test(username)) {
+    return unauthorized('El nombre de usuario debe tener 3–20 caracteres (minúsculas, números, _).', 400);
+  }
+  if (!EMAIL_RE.test(email)) return unauthorized('Ingresa un email válido.', 400);
+  if (!firstName) return unauthorized('El nombre es obligatorio.', 400);
+
+  const [{ data: takenU }, { data: takenE }] = await Promise.all([
+    supabase.from('users').select('id').eq('username', username).maybeSingle(),
+    supabase.from('users').select('id').ilike('email', email).maybeSingle(),
+  ]);
+  if (takenU) return unauthorized('Ese nombre de usuario ya existe.', 409);
+  if (takenE) return unauthorized('Ese email ya está registrado.', 409);
+
+  const { data: created, error: iErr } = await supabase
+    .from('users')
+    .insert({
+      username,
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      nickname: null,
+      role: 'player',
+      pin_hash: null,
+      listed: true,
+      is_active: true,
+      created_by: user.id,
+    })
+    .select('*')
+    .single();
+  if (iErr || !created) return unauthorized(iErr?.message ?? 'No se pudo crear el usuario.', 500);
+
+  // Enlace de acceso por correo: al abrirlo se confirma el email y queda
+  // logueado (15 min, un solo uso). Un fallo del correo no invalida el alta.
+  let notified = false;
+  if (body.notify !== false) {
+    try {
+      const token = magicToken();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      await supabase.from('magic_links').insert({
+        user_id: created.id,
+        email,
+        token,
+        purpose: 'login',
+        used: false,
+        expires_at: expiresAt,
+      });
+      const url = confirmUrl(token);
+      await sendEmail({
+        to: email,
+        subject: 'Te dieron de alta en PolluxPadel',
+        html: `
+          <p>Hola ${firstName},</p>
+          <p>Te dieron de alta en <b>PolluxPadel</b>. Toca el siguiente enlace para entrar:</p>
+          <p><a href="${url}">${url}</a></p>
+          <p>El enlace vence en 15 minutos y es de un solo uso. Si se te vence,
+          puedes pedir otro desde la pantalla de acceso con tu correo (${email}).</p>
+        `,
+      });
+      notified = true;
+    } catch (err) {
+      console.error('[admin/users] fallo enviando correo de bienvenida', err);
+    }
+  }
+
+  await audit(supabase, {
+    userId: user.id,
+    action: 'create_user',
+    entity: 'user',
+    entityId: created.id,
+    details: { username, email, notified },
+  });
+  return NextResponse.json({ ok: true, user: created, notified });
+}
 export async function GET(req: NextRequest) {
   const { user, error } = await requireUser(req);
   if (error) return unauthorized(error.message, error.status);

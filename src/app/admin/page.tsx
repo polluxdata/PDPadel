@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Shield, Users as UsersIcon, Search, ChevronLeft, ChevronRight, Trash2, LogIn,
+  Shield, Users as UsersIcon, Search, ChevronLeft, ChevronRight, Trash2, LogIn, UserPlus, Loader2,
 } from 'lucide-react';
 import AppHeader, { BottomNav } from '@/components/AppHeader';
 import { useSession, isSuper } from '@/lib/session';
@@ -115,6 +115,15 @@ function UsersAdmin() {
   const [loading, setLoading] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Alta directa (para jugadores que no se registran solos).
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ username: '', email: '', firstName: '', lastName: '' });
+  const [notify, setNotify] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [avail, setAvail] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const availTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const PAGE_SIZE = 20;
 
   async function deleteUser(u: User) {
@@ -161,6 +170,66 @@ function UsersAdmin() {
     };
   }, [query, filter]);
 
+  // Disponibilidad del nombre de usuario (debounce) para el alta directa.
+  useEffect(() => {
+    const value = createForm.username.trim().toLowerCase();
+    const task = Promise.resolve().then(() => {
+      if (!/^[a-z0-9_]{3,20}$/.test(value)) {
+        setAvail('idle');
+        return;
+      }
+      setAvail('checking');
+    });
+    if (availTimer.current) clearTimeout(availTimer.current);
+    availTimer.current = setTimeout(async () => {
+      await task;
+      const res = await fetch(`/api/users/check?username=${encodeURIComponent(value)}`);
+      const data = await res.json();
+      setAvail(data.available ? 'available' : 'taken');
+    }, 350);
+    return () => {
+      if (availTimer.current) clearTimeout(availTimer.current);
+    };
+  }, [createForm.username]);
+
+  async function createUser(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateMsg(null);
+    setCreating(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: createForm.username.trim().toLowerCase(),
+          email: createForm.email,
+          firstName: createForm.firstName,
+          lastName: createForm.lastName,
+          notify,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setCreateMsg({
+          ok: true,
+          text: data.notified
+            ? `${displayName(data.user as User)} dado de alta. Le enviamos un enlace de acceso a su correo.`
+            : `${displayName(data.user as User)} dado de alta, pero no pudimos enviar el correo. Podrá entrar desde /login con su email.`,
+        });
+        setCreateForm({ username: '', email: '', firstName: '', lastName: '' });
+        setNotify(true);
+        setPage(1);
+        await load();
+      } else {
+        setCreateMsg({ ok: false, text: data.error || 'No se pudo crear el usuario.' });
+      }
+    } catch {
+      setCreateMsg({ ok: false, text: 'Error al crear el usuario.' });
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const fromShown = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const toShown = Math.min(total, page * PAGE_SIZE);
@@ -170,6 +239,109 @@ function UsersAdmin() {
       <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
         <UsersIcon size={15} /> Usuarios ({total})
       </h2>
+
+      <button
+        onClick={() => {
+          setShowCreate((v) => !v);
+          setCreateMsg(null);
+        }}
+        className="btn-secondary mb-3 flex w-full items-center justify-center gap-2 text-sm"
+      >
+        <UserPlus size={15} />
+        {showCreate ? 'Cerrar alta manual' : 'Dar de alta a un jugador'}
+      </button>
+
+      {showCreate && (
+        <form onSubmit={createUser} className="card mb-4 flex flex-col gap-3">
+          <p className="text-xs text-slate-400">
+            Alta directa sin registro: perfecto para jugadores que no usan
+            mucho el teléfono. Solo capturas sus datos y les envías el acceso.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Nombre</label>
+              <input
+                className="input"
+                value={createForm.firstName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, firstName: e.target.value }))}
+                placeholder="Ej: Roberto"
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Apellido</label>
+              <input
+                className="input"
+                value={createForm.lastName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, lastName: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="label">Nombre de usuario</label>
+            <input
+              className="input"
+              value={createForm.username}
+              onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value.toLowerCase() }))}
+              placeholder="ej: rsilva"
+              required
+            />
+            {createForm.username.length > 0 && (
+              <p
+                className={
+                  'mt-1 text-xs ' +
+                  (avail === 'taken'
+                    ? 'text-rose-400'
+                    : avail === 'available'
+                      ? 'text-orange-400'
+                      : 'text-slate-500')
+                }
+              >
+                {avail === 'checking'
+                  ? 'Comprobando…'
+                  : avail === 'taken'
+                    ? 'Ese nombre de usuario ya existe'
+                    : avail === 'available'
+                      ? '¡Disponible!'
+                      : '3 a 20 caracteres (letras, números, _)'}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input
+              type="email"
+              className="input"
+              value={createForm.email}
+              onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="su@correo.com"
+              required
+            />
+          </div>
+          <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              checked={notify}
+              onChange={(e) => setNotify(e.target.checked)}
+              className="h-4 w-4 accent-orange-500"
+            />
+            Enviarle un enlace de acceso por correo ahora
+          </label>
+          {createMsg && (
+            <p className={createMsg.ok ? 'text-sm text-orange-300' : 'text-sm text-rose-400'}>
+              {createMsg.text}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={creating || avail !== 'available' || !createForm.email || !createForm.firstName}
+            className="btn-primary !py-2.5"
+          >
+            {creating && <Loader2 size={15} className="animate-spin" />}
+            Crear usuario
+          </button>
+        </form>
+      )}
 
       <div className="mb-3 flex gap-2">
         <div className="relative flex-1">
